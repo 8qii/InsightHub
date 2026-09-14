@@ -4,7 +4,7 @@ InsightHub is an enterprise Knowledge & Data Agent for answering business questi
 
 ## Current Phase
 
-Phase 1.5 validates the AnythingLLM integration as a real RAG path. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, managed vector storage, and RAG generation. InsightHub exposes a normalized knowledge query API. Structured-data and agent features are not implemented.
+Phase 4 adds a lightweight AI Analyst Agent. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, managed vector storage, and knowledge retrieval. InsightHub owns the bounded agent loop, typed business tools, PostgreSQL access, citations, and evaluation.
 
 ## Architecture
 
@@ -13,6 +13,14 @@ AnythingLLM
     | Developer API
     v
 FastAPI Intelligence Service
+    |\
+    | \-- OpenAI-compatible Analyst Agent
+    |     |-- search_company_knowledge
+    |     |-- get_sales_summary
+    |     |-- get_inventory_risk
+    |     \-- get_discount_violations
+    |
+    \-- Typed PostgreSQL business tools
 ```
 
 AnythingLLM remains an external OSS component; InsightHub does not fork its internals.
@@ -75,7 +83,7 @@ Query the configured workspace through InsightHub:
 curl -X POST http://127.0.0.1:8000/api/v1/knowledge/query \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: phase1-demo" \
-  -d '{"workspace_id":"insighthub-phase1","query":"What is the maximum VIP discount?"}'
+  -d '{"workspace_id":"insighthub-demo","query":"What is the maximum VIP discount?"}'
 ```
 
 PowerShell:
@@ -84,9 +92,21 @@ PowerShell:
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/knowledge/query `
   -ContentType "application/json" `
   -Headers @{ "X-Request-ID" = "phase1-demo" } `
-  -Body '{"workspace_id":"insighthub-phase1","query":"What is the maximum VIP discount?"}'
+  -Body '{"workspace_id":"insighthub-demo","query":"What is the maximum VIP discount?"}'
 ```
+
+## Agent Query
+
+The agent endpoint is available at `POST /api/v1/agent/query`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/agent/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is the maximum VIP discount allowed?"}'
+```
+
+Configure `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and `ANYTHINGLLM_WORKSPACE_ID` in the uncommitted `.env`. The model is never hardcoded in the runtime. The agent does not execute arbitrary SQL or access PostgreSQL directly.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and adjust the core application settings as needed. `ANYTHINGLLM_BASE_URL`, `ANYTHINGLLM_API_KEY`, and `ANYTHINGLLM_TIMEOUT_SECONDS` are used by the Phase 1.5 adapter. The LLM and embedding variables document the AnythingLLM provider configuration; the Intelligence service does not make a second model call in this phase.
+Copy `.env.example` to `.env` and adjust the core application settings as needed. `ANYTHINGLLM_BASE_URL`, `ANYTHINGLLM_API_KEY`, and `ANYTHINGLLM_TIMEOUT_SECONDS` configure the knowledge adapter. `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` configure the OpenAI-compatible analyst decision layer. Never commit `.env`.

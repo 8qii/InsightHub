@@ -3,6 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.agents.analyst.agent import AnalystAgent
+from app.agents.core.llm import OpenAICompatibleClient
+from app.api.agent import router as agent_router
 from app.api.data import router as data_router
 from app.api.health import router as health_router
 from app.api.knowledge import router as knowledge_router
@@ -25,12 +28,28 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         api_key=settings.anythingllm_api_key,
         timeout_seconds=settings.anythingllm_timeout_seconds,
     )
+    llm_client = OpenAICompatibleClient(
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
+        model=settings.llm_model,
+        timeout_seconds=settings.llm_timeout_seconds,
+    )
     database = Database(settings) if settings.postgres_configured else None
-    application.state.knowledge_service = KnowledgeService(client)
+    knowledge_service = KnowledgeService(client)
+    application.state.knowledge_service = knowledge_service
     application.state.database = database
+    application.state.analyst_agent = AnalystAgent(
+        llm=llm_client,
+        knowledge_service=knowledge_service,
+        workspace_id=settings.anythingllm_workspace_id,
+        session_factory=database.session_factory if database is not None else None,
+        tool_timeout_seconds=settings.agent_tool_timeout_seconds,
+        max_iterations=settings.agent_max_iterations,
+    )
     try:
         yield
     finally:
+        await llm_client.close()
         await client.close()
         if database is not None:
             await database.close()
@@ -41,4 +60,5 @@ app.middleware("http")(request_id_logging_middleware)
 app.include_router(health_router)
 app.include_router(knowledge_router)
 app.include_router(data_router)
+app.include_router(agent_router)
 register_exception_handlers(app)

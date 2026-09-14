@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -27,8 +28,20 @@ class FakeSalesService:
 
 
 class FakeInventoryService:
-    async def get_inventory_risk(self, age_threshold_days: int) -> list[InventoryRisk]:
+    async def get_inventory_risk(
+        self, age_threshold_days: int, as_of_date: date | None = None
+    ) -> list[InventoryRisk]:
         assert age_threshold_days == 90
+        assert as_of_date is None
+        return [InventoryRisk(product="Product Luna", stock_quantity=12000, age_days=138)]
+
+
+class HistoricalInventoryService:
+    async def get_inventory_risk(
+        self, age_threshold_days: int, as_of_date: date | None = None
+    ) -> list[InventoryRisk]:
+        assert age_threshold_days == 90
+        assert as_of_date == date(2025, 9, 30)
         return [InventoryRisk(product="Product Luna", stock_quantity=12000, age_days=138)]
 
 
@@ -71,6 +84,24 @@ def test_inventory_endpoint_returns_luna_risk() -> None:
     assert response.json()[0]["age_days"] == 138
 
 
+def test_inventory_endpoint_accepts_historical_as_of_date() -> None:
+    app.dependency_overrides[get_inventory_service] = HistoricalInventoryService
+    try:
+        response = TestClient(app).get(
+            "/api/v1/data/inventory/risk",
+            params={"age_threshold_days": 90, "as_of_date": "2025-09-30"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()[0] == {
+        "product": "Product Luna",
+        "stock_quantity": 12000,
+        "age_days": 138,
+    }
+
+
 def test_discount_endpoint_returns_expected_violations() -> None:
     app.dependency_overrides[get_discount_service] = FakeDiscountService
     try:
@@ -96,6 +127,10 @@ def test_data_endpoints_validate_parameters() -> None:
         ).status_code == 422
         assert client.get(
             "/api/v1/data/inventory/risk", params={"age_threshold_days": 0}
+        ).status_code == 422
+        assert client.get(
+            "/api/v1/data/inventory/risk",
+            params={"age_threshold_days": 90, "as_of_date": "not-a-date"},
         ).status_code == 422
         assert client.get(
             "/api/v1/data/discount/violations", params={"maximum_discount": 101}

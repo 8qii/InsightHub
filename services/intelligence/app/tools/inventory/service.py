@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.errors import AppError
@@ -9,9 +11,11 @@ class InventoryService:
     def __init__(self, repository: InventoryRepository) -> None:
         self.repository = repository
 
-    async def get_inventory_risk(self, age_threshold_days: int) -> list[InventoryRisk]:
+    async def get_inventory_risk(
+        self, age_threshold_days: int, as_of_date: date | None = None
+    ) -> list[InventoryRisk]:
         try:
-            rows = await self.repository.get_risk(age_threshold_days)
+            rows = await self.repository.get_risk(age_threshold_days, as_of_date)
         except SQLAlchemyError as exc:
             raise AppError(503, "database_unavailable", "The data service is unavailable.") from exc
         return [
