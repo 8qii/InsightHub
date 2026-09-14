@@ -53,7 +53,7 @@ pytest
 Run the Phase 1 stack from the repository root:
 
 ```bash
-docker compose -f deployment/docker-compose.yml up --build
+docker compose --env-file .env -f deployment/docker-compose.yml up --build
 ```
 
 This starts AnythingLLM at `http://127.0.0.1:3001` and InsightHub at `http://127.0.0.1:8000`.

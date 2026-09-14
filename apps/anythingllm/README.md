@@ -18,7 +18,7 @@ Compose mounts the named volume `anythingllm-storage` at `/app/server/storage`. 
 
 ## Initial Setup
 
-1. Start the stack with `docker compose -f deployment/docker-compose.yml up -d`.
+1. Start the stack with `docker compose --env-file .env -f deployment/docker-compose.yml up -d`.
 2. Open <http://localhost:3001> and complete the initial setup.
 3. Select an LLM provider and embedding provider in AnythingLLM.
 4. Create a workspace and upload a non-sensitive document.

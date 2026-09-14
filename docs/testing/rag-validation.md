@@ -8,7 +8,7 @@ This procedure validates the real AnythingLLM path with real model inference, re
 2. Start the services:
 
    ```bash
-   docker compose -f deployment/docker-compose.yml up -d
+   docker compose --env-file .env -f deployment/docker-compose.yml up -d
    ```
 
 3. Open `http://localhost:3001` and complete AnythingLLM's initial setup.
