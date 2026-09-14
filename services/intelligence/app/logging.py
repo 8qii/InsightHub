@@ -31,6 +31,8 @@ class JsonFormatter(logging.Formatter):
             "iteration",
             "run_id",
             "event_type",
+            "failure_reason",
+            "recovered",
         ):
             value = getattr(record, field, None)
             if value is not None:

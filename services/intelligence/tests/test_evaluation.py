@@ -28,13 +28,13 @@ DATASET_PATH = Path(__file__).resolve().parents[3] / "evaluation" / "agent" / "q
 def test_dataset_loads_required_cases() -> None:
     cases = load_dataset(DATASET_PATH)
 
-    assert len(cases) == 4
-    assert {case.id for case in cases} == {
+    assert len(cases) >= 20
+    assert {
         "vip-discount-policy",
         "discount-violations",
         "luna-q3-analysis",
         "historical-inventory-analysis",
-    }
+    }.issubset({case.id for case in cases})
 
 
 def test_evaluator_matches_tools_facts_sources_and_context() -> None:
@@ -101,7 +101,12 @@ def test_trace_records_timing_and_status_without_content() -> None:
 
     assert payload["run_id"] == "run-test"
     assert payload["tool_events"] == [
-        {"tool_name": "get_inventory_risk", "duration_ms": 4.2, "status": "success"}
+        {
+            "tool_name": "get_inventory_risk",
+            "duration_ms": 4.2,
+            "status": "success",
+            "failure_reason": None,
+        }
     ]
     assert "answer" not in json.dumps(payload)
 
@@ -146,10 +151,54 @@ def test_evaluation_response_schema_contains_summary() -> None:
         fact_match_accuracy=1,
         source_match_accuracy=1,
         context_accuracy=1,
+        hallucination_score=1,
+        abstention_score=1,
+        failure_recovery_score=1,
         overall_score=1,
     )
 
     assert response.overall_score == 1
+
+
+def test_evaluator_detects_hallucinated_forbidden_fact() -> None:
+    case = EvaluationCase(
+        id="hallucination",
+        question="What is the policy?",
+        expected_tools=[],
+        expected_facts=[],
+        expected_sources=[],
+        should_not_contain=["15%"],
+    )
+    result = AgentResult(
+        answer="The policy permits 15%.", sources=[], selected_tools=[], iterations=1
+    )
+
+    evaluation = evaluate_case(case, result)
+
+    assert evaluation.hallucination_score == 0
+    assert evaluation.passed is False
+
+
+def test_evaluator_scores_abstention_and_missing_data() -> None:
+    case = EvaluationCase(
+        id="missing",
+        question="Unknown product",
+        expected_tools=[],
+        expected_facts=[],
+        expected_sources=[],
+        expected_behavior="abstain",
+    )
+    result = AgentResult(
+        answer="I cannot verify that because the data is not available.",
+        sources=[],
+        selected_tools=[],
+        iterations=1,
+    )
+
+    evaluation = evaluate_case(case, result)
+
+    assert evaluation.abstention_score == 1
+    assert evaluation.hallucination_score == 1
 
 
 def test_json_logs_filter_secrets_and_content() -> None:

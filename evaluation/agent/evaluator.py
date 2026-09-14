@@ -15,21 +15,28 @@ class EvaluationCase(BaseModel):
     expected_tools: list[str]
     expected_facts: list[str]
     expected_sources: list[str]
+    expected_behavior: str = "answer"
+    should_not_contain: list[str] = Field(default_factory=list)
     required_context: dict[str, Any] = Field(default_factory=dict)
 
 
 class CaseEvaluation(BaseModel):
     id: str
+    expected_behavior: str
     passed: bool
     score: float
     tool_selection_score: float
     fact_score: float
     source_score: float
     context_score: float
+    hallucination_score: float
+    abstention_score: float
+    failure_recovery_score: float
     selected_tools: list[str]
     matched_facts: list[str]
     matched_sources: list[str]
     context_matches: list[str]
+    forbidden_matches: list[str]
     answer_sha256: str
     error: str | None = None
 
@@ -42,6 +49,9 @@ class EvaluationSummary(BaseModel):
     fact_match_accuracy: float
     source_match_accuracy: float
     context_accuracy: float
+    hallucination_score: float
+    abstention_score: float
+    failure_recovery_score: float
     overall_score: float
 
 
@@ -73,24 +83,57 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
         source for source in case.expected_sources if source.casefold() in source_titles
     ]
     context_matches = _match_context(case.required_context, getattr(result, "tool_calls", []))
+    forbidden_matches = [
+        phrase for phrase in case.should_not_contain if _contains(answer, phrase)
+    ]
+    hallucination_score = _ratio(
+        len(case.should_not_contain) - len(forbidden_matches), len(case.should_not_contain)
+    )
+    abstention_score = _abstention_score(case.expected_behavior, answer)
+    failure_recovery_score = _recovery_score(case.expected_behavior, result)
     tool_score = float(set(selected_tools) == set(case.expected_tools))
     fact_score = _ratio(len(matched_facts), len(case.expected_facts))
     source_score = _ratio(len(matched_sources), len(case.expected_sources))
     context_expected = _expected_context_count(case.required_context)
     context_score = _ratio(len(context_matches), context_expected)
-    score = round((tool_score + fact_score + source_score + context_score) / 4, 4)
+    score = round(
+        (
+            tool_score
+            + fact_score
+            + source_score
+            + context_score
+            + hallucination_score
+            + abstention_score
+            + failure_recovery_score
+        )
+        / 7,
+        4,
+    )
     return CaseEvaluation(
         id=case.id,
-        passed=(tool_score == 1 and fact_score == 1 and source_score == 1 and context_score == 1),
+        expected_behavior=case.expected_behavior,
+        passed=(
+            tool_score == 1
+            and fact_score == 1
+            and source_score == 1
+            and context_score == 1
+            and hallucination_score == 1
+            and abstention_score == 1
+            and failure_recovery_score == 1
+        ),
         score=score,
         tool_selection_score=tool_score,
         fact_score=fact_score,
         source_score=source_score,
         context_score=context_score,
+        hallucination_score=hallucination_score,
+        abstention_score=abstention_score,
+        failure_recovery_score=failure_recovery_score,
         selected_tools=selected_tools,
         matched_facts=matched_facts,
         matched_sources=matched_sources,
         context_matches=context_matches,
+        forbidden_matches=forbidden_matches,
         answer_sha256=hashlib.sha256(answer.encode("utf-8")).hexdigest(),
     )
 
@@ -98,16 +141,21 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
 def failed_case(case: EvaluationCase, error: str) -> CaseEvaluation:
     return CaseEvaluation(
         id=case.id,
+        expected_behavior=case.expected_behavior,
         passed=False,
         score=0,
         tool_selection_score=0,
         fact_score=0,
         source_score=0,
         context_score=0,
+        hallucination_score=0,
+        abstention_score=0,
+        failure_recovery_score=0,
         selected_tools=[],
         matched_facts=[],
         matched_sources=[],
         context_matches=[],
+        forbidden_matches=[],
         answer_sha256="",
         error=error,
     )
@@ -123,6 +171,11 @@ def summarize(cases: list[CaseEvaluation]) -> EvaluationSummary:
         fact_match_accuracy=_average(case.fact_score for case in cases),
         source_match_accuracy=_average(case.source_score for case in cases),
         context_accuracy=_average(case.context_score for case in cases),
+        hallucination_score=_average(case.hallucination_score for case in cases),
+        abstention_score=_scoped_average(
+            cases, {"abstain", "clarify", "missing_information"}, "abstention_score"
+        ),
+        failure_recovery_score=_scoped_average(cases, {"recover"}, "failure_recovery_score"),
         overall_score=_average(case.score for case in cases),
     )
 
@@ -142,6 +195,42 @@ def _contains(answer: str, fact: str) -> bool:
     return re.sub(r"\s+", " ", fact.casefold()) in re.sub(r"\s+", " ", answer.casefold())
 
 
+def _abstention_score(expected_behavior: str, answer: str) -> float:
+    if expected_behavior not in {"abstain", "clarify", "missing_information"}:
+        return 1.0
+    markers = (
+        "cannot",
+        "can't",
+        "do not have",
+        "don't have",
+        "not available",
+        "unable",
+        "insufficient",
+        "not found",
+        "no information",
+        "no data",
+        "no sales data",
+        "not provided",
+        "not specified",
+        "does not specify",
+        "not enough information",
+        "cannot verify",
+        "please provide",
+        "could you clarify",
+        "could you specify",
+        "which quarter",
+        "which period",
+    )
+    return float(any(marker in answer.casefold() for marker in markers))
+
+
+def _recovery_score(expected_behavior: str, result: Any) -> float:
+    if expected_behavior != "recover":
+        return 1.0
+    trace = getattr(result, "trace", None)
+    return float(bool(trace and getattr(trace, "recovered", False)))
+
+
 def _ratio(matched: int, expected: int) -> float:
     return 1.0 if expected == 0 else round(matched / expected, 4)
 
@@ -158,7 +247,7 @@ def _match_context(context: dict[str, Any], tool_calls: list[dict[str, Any]]) ->
                 continue
             actual = call.get("arguments", {})
             for key, value in expected_arguments.items():
-                if actual.get(key) == value:
+                if _values_equal(actual.get(key), value):
                     matches.append(f"{tool_name}.{key}")
             break
     return matches
@@ -167,3 +256,16 @@ def _match_context(context: dict[str, Any], tool_calls: list[dict[str, Any]]) ->
 def _average(values: Any) -> float:
     values = list(values)
     return round(sum(values) / len(values), 4) if values else 0.0
+
+
+def _values_equal(actual: Any, expected: Any) -> bool:
+    if isinstance(actual, (int, float)) and isinstance(expected, (int, float)):
+        return float(actual) == float(expected)
+    return actual == expected
+
+
+def _scoped_average(
+    cases: list[CaseEvaluation], behaviors: set[str], field_name: str
+) -> float:
+    scoped = [case for case in cases if case.expected_behavior in behaviors]
+    return _average(getattr(case, field_name) for case in scoped) if scoped else 1.0

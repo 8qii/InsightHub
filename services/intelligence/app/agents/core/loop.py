@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -20,13 +21,37 @@ class AgentLoop:
         registry: ToolRegistry,
         tool_timeout_seconds: float,
         max_iterations: int,
+        max_tool_failures: int = 2,
+        timeout_seconds: float = 120.0,
     ) -> None:
         self._llm = llm
         self._registry = registry
         self._tool_timeout_seconds = tool_timeout_seconds
         self._max_iterations = max_iterations
+        self._max_tool_failures = max_tool_failures
+        self._timeout_seconds = timeout_seconds
 
     async def run(
+        self,
+        question: str,
+        request_id: str,
+        system_prompt: str,
+        run_id: str | None = None,
+        default_tool_arguments: dict[str, dict[str, Any]] | None = None,
+    ) -> AgentResult:
+        try:
+            async with asyncio.timeout(self._timeout_seconds):
+                return await self._run(
+                    question,
+                    request_id,
+                    system_prompt,
+                    run_id,
+                    default_tool_arguments,
+                )
+        except TimeoutError as exc:
+            raise AppError(504, "agent_timeout", "The agent timed out safely.") from exc
+
+    async def _run(
         self,
         question: str,
         request_id: str,
@@ -41,6 +66,9 @@ class AgentLoop:
         selected_tools: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         sources: list[Any] = []
+        tool_failure_count = 0
+        failure_reason: str | None = None
+        recovered = False
         started_at = time.perf_counter()
         trace = TraceRecorder(run_id)
         context = ToolContext(
@@ -65,7 +93,7 @@ class AgentLoop:
                     iterations=iteration,
                     run_id=trace.run_id,
                     tool_calls=tool_calls,
-                    trace=trace.finish(),
+                    trace=trace.finish(failure_reason, recovered),
                 )
 
             messages.append(response.message)
@@ -88,6 +116,17 @@ class AgentLoop:
                     _apply_default_arguments(tool_call.name, tool_call.arguments, context),
                     context,
                 )
+                if not result.ok:
+                    tool_failure_count += 1
+                    failure_reason = result.error_code or result.error
+                    if tool_failure_count > self._max_tool_failures:
+                        raise AppError(
+                            502,
+                            "agent_tool_failure_limit",
+                            "The agent exceeded its tool failure limit.",
+                        )
+                elif tool_failure_count:
+                    recovered = True
                 if isinstance(result.data, dict) and isinstance(result.data.get("sources"), list):
                     sources.extend(result.data["sources"])
                 messages.append(

@@ -10,6 +10,8 @@ def test_settings_uses_safe_defaults() -> None:
     assert settings.app_env == "development"
     assert settings.anythingllm_api_key is None
     assert settings.max_upload_size_mb == 100
+    assert settings.agent_timeout_seconds == 120
+    assert settings.agent_max_tool_failures == 2
 
 
 def test_settings_rejects_invalid_environment() -> None:

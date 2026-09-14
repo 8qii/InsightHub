@@ -12,14 +12,31 @@ class TraceRecorder:
         self._started_at = time.perf_counter()
         self._tool_events: list[ToolTraceEvent] = []
 
-    def record_tool(self, tool_name: str, duration_ms: float, status: str) -> None:
+    def record_tool(
+        self,
+        tool_name: str,
+        duration_ms: float,
+        status: str,
+        failure_reason: str | None = None,
+    ) -> None:
         self._tool_events.append(
-            ToolTraceEvent(tool_name=tool_name, duration_ms=duration_ms, status=status)
+            ToolTraceEvent(
+                tool_name=tool_name,
+                duration_ms=duration_ms,
+                status=status,
+                failure_reason=failure_reason,
+            )
         )
 
-    def finish(self) -> AgentTrace:
+    def finish(
+        self,
+        failure_reason: str | None = None,
+        recovered: bool = False,
+    ) -> AgentTrace:
         return AgentTrace(
             run_id=self.run_id,
             duration_ms=round((time.perf_counter() - self._started_at) * 1000, 2),
             tool_events=list(self._tool_events),
+            failure_reason=failure_reason,
+            recovered=recovered,
         )

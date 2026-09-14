@@ -18,6 +18,9 @@ class EvaluationRunResponse(BaseModel):
     fact_match_accuracy: float
     source_match_accuracy: float
     context_accuracy: float
+    hallucination_score: float
+    abstention_score: float
+    failure_recovery_score: float
     overall_score: float
 
 

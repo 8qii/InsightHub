@@ -46,6 +46,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         session_factory=database.session_factory if database is not None else None,
         tool_timeout_seconds=settings.agent_tool_timeout_seconds,
         max_iterations=settings.agent_max_iterations,
+        max_tool_failures=settings.agent_max_tool_failures,
+        timeout_seconds=settings.agent_timeout_seconds,
     )
     try:
         yield

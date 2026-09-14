@@ -24,6 +24,9 @@ For Nova Retail Q3 historical analysis, use as_of_date="2025-09-30" in get_inven
 so inventory age matches the business review snapshot; do not use the current date.
 Do not repeat a tool call unless its previous result was an error or insufficient.
 Never invent numbers, policies, sources, or tool results. If a tool fails, explain the limitation.
+If a question is ambiguous or missing a required product, quarter, or time period,
+ask a concise clarification question instead of guessing.
+If the available sources do not contain the requested information, say that it cannot be verified.
 Give a concise answer with the relevant numbers and cite document source titles when available.
 """
 
@@ -37,6 +40,8 @@ class AnalystAgent:
         session_factory: async_sessionmaker[AsyncSession] | None,
         tool_timeout_seconds: float,
         max_iterations: int,
+        max_tool_failures: int = 2,
+        timeout_seconds: float = 120.0,
     ) -> None:
         self._llm = llm
         self._knowledge_service = knowledge_service
@@ -44,6 +49,8 @@ class AnalystAgent:
         self._session_factory = session_factory
         self._tool_timeout_seconds = tool_timeout_seconds
         self._max_iterations = max_iterations
+        self._max_tool_failures = max_tool_failures
+        self._timeout_seconds = timeout_seconds
 
     async def query(self, question: str, request_id: str) -> AgentResult:
         question_id = hashlib.sha256(question.encode("utf-8")).hexdigest()[:16]
@@ -77,6 +84,8 @@ class AnalystAgent:
             registry,
             self._tool_timeout_seconds,
             self._max_iterations,
+            self._max_tool_failures,
+            self._timeout_seconds,
         ).run(
             question,
             request_id,

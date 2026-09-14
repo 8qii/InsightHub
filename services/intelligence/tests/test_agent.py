@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.agents.analyst.agent import AnalystAgent
@@ -19,6 +20,7 @@ from app.agents.tools.definitions import (
     SalesToolInput,
     build_tool_definitions,
 )
+from app.errors import AppError
 from app.main import app
 from app.tools.discount.models import DiscountViolations
 from app.tools.inventory.models import InventoryRisk
@@ -99,7 +101,27 @@ def test_tool_executor_returns_safe_failure_for_invalid_arguments() -> None:
     )
 
     assert result.ok is False
+    assert result.status == "error"
+    assert result.error_code == "invalid_arguments"
     assert result.error == "Invalid tool arguments."
+
+
+def test_tool_executor_handles_timeout_with_typed_error() -> None:
+    async def slow_tool(_: Any, __: ToolContext) -> str:
+        await asyncio.sleep(0.05)
+        return "late"
+
+    registry = ToolRegistry(
+        [ToolDefinition("slow", "Slow tool.", KnowledgeToolInput, slow_tool)]
+    )
+    result = asyncio.run(
+        ToolExecutor(registry, 0.001).execute(
+            "slow", '{"query":"test"}', ToolContext("request")
+        )
+    )
+
+    assert result.status == "error"
+    assert result.error_code == "tool_timeout"
 
 
 def test_agent_continues_after_tool_failure() -> None:
@@ -115,6 +137,80 @@ def test_agent_continues_after_tool_failure() -> None:
 
     assert "unavailable" in result.answer
     assert result.selected_tools == ["get_inventory_risk"]
+
+
+def test_agent_marks_recovered_after_tool_failure() -> None:
+    calls = 0
+
+    async def flaky_tool(_: Any, __: ToolContext) -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise AppError(503, "temporary_failure", "Temporary failure.")
+        return "recovered"
+
+    registry = ToolRegistry(
+        [ToolDefinition("flaky", "A flaky tool.", KnowledgeToolInput, flaky_tool)]
+    )
+    loop = AgentLoop(
+        FakeLLM(
+            [
+                llm_response(calls=[("flaky", {"query": "test"})]),
+                llm_response(calls=[("flaky", {"query": "test"})]),
+                llm_response("The tool recovered."),
+            ]
+        ),
+        registry,
+        1,
+        4,
+        2,
+        5,
+    )
+
+    result = asyncio.run(loop.run("test", "request-recovery", "Analyst"))
+
+    assert result.trace is not None
+    assert result.trace.recovered is True
+    assert result.trace.tool_events[0].failure_reason == "temporary_failure"
+
+
+def test_agent_enforces_tool_failure_limit() -> None:
+    async def failing_tool(_: Any, __: ToolContext) -> str:
+        raise AppError(503, "temporary_failure", "Temporary failure.")
+
+    registry = ToolRegistry(
+        [ToolDefinition("failing", "A failing tool.", KnowledgeToolInput, failing_tool)]
+    )
+    loop = AgentLoop(
+        FakeLLM(
+            [
+                llm_response(calls=[("failing", {"query": "test"})]),
+                llm_response(calls=[("failing", {"query": "test"})]),
+            ]
+        ),
+        registry,
+        1,
+        4,
+        1,
+        5,
+    )
+
+    with pytest.raises(AppError, match="tool failure limit"):
+        asyncio.run(loop.run("test", "request-failure-limit", "Analyst"))
+
+
+def test_agent_timeout_handling() -> None:
+    class SlowLLM(FakeLLM):
+        async def complete(
+            self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+        ) -> LLMResponse:
+            await asyncio.sleep(0.05)
+            return llm_response("late")
+
+    loop = AgentLoop(SlowLLM([]), ToolRegistry([]), 1, 4, 2, 0.001)
+
+    with pytest.raises(AppError, match="timed out safely"):
+        asyncio.run(loop.run("test", "request-timeout", "Analyst"))
 
 
 def test_discount_scenario_uses_discount_tool() -> None:

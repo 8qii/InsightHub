@@ -5,7 +5,8 @@
     "expected_tools": ["search_company_knowledge"],
     "expected_facts": ["12%"],
     "expected_sources": ["sales_policy.md"],
-    "required_context": {}
+    "expected_behavior": "answer",
+    "should_not_contain": ["15%"]
   },
   {
     "id": "discount-violations",
@@ -13,23 +14,20 @@
     "expected_tools": ["get_discount_violations"],
     "expected_facts": ["180"],
     "expected_sources": [],
-    "required_context": {}
+    "expected_behavior": "answer",
+    "should_not_contain": ["1800"]
   },
   {
     "id": "luna-q3-analysis",
     "question": "Why did Product Luna revenue decline in Q3?",
-    "expected_tools": [
-      "search_company_knowledge",
-      "get_sales_summary",
-      "get_inventory_risk"
-    ],
+    "expected_tools": ["search_company_knowledge", "get_sales_summary", "get_inventory_risk"],
     "expected_facts": ["18%", "$300,000", "$246,000", "138 days"],
     "expected_sources": ["q3_business_review.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["increased", "grew"],
     "required_context": {
       "tool_arguments": {
-        "get_inventory_risk": {
-          "as_of_date": "2025-09-30"
-        }
+        "get_inventory_risk": {"as_of_date": "2025-09-30"}
       }
     }
   },
@@ -39,12 +37,180 @@
     "expected_tools": ["get_inventory_risk"],
     "expected_facts": ["138 days"],
     "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["today", "current date"],
     "required_context": {
       "tool_arguments": {
-        "get_inventory_risk": {
-          "as_of_date": "2025-09-30"
-        }
+        "get_inventory_risk": {"as_of_date": "2025-09-30"}
       }
     }
+  },
+  {
+    "id": "luna-q1-revenue",
+    "question": "What was Product Luna revenue in Q1?",
+    "expected_tools": ["get_sales_summary"],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["Q3"]
+  },
+  {
+    "id": "luna-q2-revenue",
+    "question": "What was Product Luna revenue in Q2?",
+    "expected_tools": ["get_sales_summary"],
+    "expected_facts": ["$300,000"],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["$246,000"]
+  },
+  {
+    "id": "luna-q3-revenue",
+    "question": "What was Product Luna revenue in Q3?",
+    "expected_tools": ["get_sales_summary"],
+    "expected_facts": ["$246,000"],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["$300,000"]
+  },
+  {
+    "id": "inventory-risk-list",
+    "question": "Which products have inventory at least 90 days old?",
+    "expected_tools": ["get_inventory_risk"],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["I cannot access inventory"]
+  },
+  {
+    "id": "discount-threshold-ten",
+    "question": "How many orders exceeded a 10% discount?",
+    "expected_tools": ["get_discount_violations"],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["12%"],
+    "required_context": {
+      "tool_arguments": {
+        "get_discount_violations": {"maximum_discount": 10}
+      }
+    }
+  },
+  {
+    "id": "policy-citation",
+    "question": "Which document defines the VIP discount policy?",
+    "expected_tools": ["search_company_knowledge"],
+    "expected_facts": [],
+    "expected_sources": ["sales_policy.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["q3_business_review.md"]
+  },
+  {
+    "id": "future-policy-missing",
+    "question": "What is the VIP discount policy for 2027?",
+    "expected_tools": ["search_company_knowledge"],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "missing_information",
+    "should_not_contain": ["2027 is", "15%", "20%"]
+  },
+  {
+    "id": "unknown-product-sales",
+    "question": "What was Product Zeta revenue in Q3?",
+    "expected_tools": ["get_sales_summary"],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "abstain",
+    "should_not_contain": ["$", "revenue was"]
+  },
+  {
+    "id": "ambiguous-sales-question",
+    "question": "How did sales perform?",
+    "expected_tools": [],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "clarify",
+    "should_not_contain": ["$300,000", "$246,000", "12%"]
+  },
+  {
+    "id": "ambiguous-luna-question",
+    "question": "Tell me about Luna.",
+    "expected_tools": [],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "clarify",
+    "should_not_contain": ["138 days", "$246,000", "12%"]
+  },
+  {
+    "id": "policy-conflict-check",
+    "question": "Does the policy allow a 15% VIP discount?",
+    "expected_tools": ["search_company_knowledge"],
+    "expected_facts": ["12%"],
+    "expected_sources": ["sales_policy.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["15% is allowed"]
+  },
+  {
+    "id": "q2-q3-comparison",
+    "question": "Compare Product Luna revenue in Q2 and Q3.",
+    "expected_tools": ["get_sales_summary"],
+    "expected_facts": ["$300,000", "$246,000"],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["revenue was unchanged"]
+  },
+  {
+    "id": "luna-cited-analysis",
+    "question": "What evidence explains the Q3 decline for Product Luna?",
+    "expected_tools": ["search_company_knowledge", "get_sales_summary", "get_inventory_risk"],
+    "expected_facts": ["18%", "138 days"],
+    "expected_sources": ["q3_business_review.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["revenue increased"],
+    "required_context": {
+      "tool_arguments": {
+        "get_inventory_risk": {"as_of_date": "2025-09-30"}
+      }
+    }
+  },
+  {
+    "id": "inventory-snapshot-citation",
+    "question": "As of 2025-09-30, was Product Luna inventory risky at the end of Q3?",
+    "expected_tools": ["get_inventory_risk"],
+    "expected_facts": ["138 days"],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["current date"],
+    "required_context": {
+      "tool_arguments": {
+        "get_inventory_risk": {"as_of_date": "2025-09-30"}
+      }
+    }
+  },
+  {
+    "id": "missing-quarter",
+    "question": "What was Product Luna revenue?",
+    "expected_tools": [],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "clarify",
+    "should_not_contain": ["$300,000", "$246,000"]
+  },
+  {
+    "id": "combined-policy-and-violations",
+    "question": "What is the allowed VIP discount and how many orders exceeded it?",
+    "expected_tools": ["search_company_knowledge", "get_discount_violations"],
+    "expected_facts": ["12%", "180"],
+    "expected_sources": ["sales_policy.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["no data"]
+  },
+  {
+    "id": "q3-review-citation",
+    "question": "Cite the business review that discusses Product Luna's Q3 decline.",
+    "expected_tools": ["search_company_knowledge"],
+    "expected_facts": [],
+    "expected_sources": ["q3_business_review.md"],
+    "expected_behavior": "answer",
+    "should_not_contain": ["sales_policy.md"]
   }
 ]

@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,10 +49,16 @@ class LLMResponse:
     tool_calls: list[LLMToolCall]
 
 
-class ToolExecutionResult(BaseModel):
+class ToolResult(BaseModel):
     ok: bool
+    status: Literal["success", "error"]
     data: Any = None
     error: str | None = None
+    error_code: str | None = None
+
+
+# Kept as a local alias for callers from the Phase 5 contract.
+ToolExecutionResult = ToolResult
 
 
 class AgentResult(BaseModel):

@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_timeout_seconds: float = Field(default=60.0, gt=0, le=300)
     agent_tool_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    agent_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     agent_max_iterations: PositiveInt = Field(default=6, le=12)
+    agent_max_tool_failures: int = Field(default=2, ge=0, le=12)
     embedding_provider: str | None = None
     embedding_model: str | None = None
 
