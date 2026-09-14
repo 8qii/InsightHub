@@ -10,6 +10,8 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi==0.115.12",
     "httpx==0.28.1",
+    "SQLAlchemy==2.0.40",
+    "asyncpg==0.30.0",
     "pydantic-settings==2.8.1",
     "uvicorn[standard]==0.34.0",
 ]

@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 ENV_FILES = tuple(parent / ".env" for parent in Path(__file__).resolve().parents)
 
@@ -38,6 +39,31 @@ class Settings(BaseSettings):
     postgres_database: str | None = None
     postgres_user: str | None = None
     postgres_password: str | None = None
+
+    @property
+    def postgres_configured(self) -> bool:
+        return all(
+            value is not None and value != ""
+            for value in (
+                self.postgres_host,
+                self.postgres_database,
+                self.postgres_user,
+                self.postgres_password,
+            )
+        )
+
+    @property
+    def postgres_url(self) -> URL:
+        if not self.postgres_configured:
+            raise ValueError("PostgreSQL configuration is incomplete")
+        return URL.create(
+            drivername="postgresql+asyncpg",
+            username=self.postgres_user,
+            password=self.postgres_password,
+            host=self.postgres_host,
+            port=self.postgres_port,
+            database=self.postgres_database,
+        )
 
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None

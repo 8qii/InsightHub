@@ -1,0 +1,1 @@
+"""Discount business capability."""

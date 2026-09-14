@@ -33,6 +33,11 @@ services:
       DUCKDB_PATH: ${DUCKDB_PATH:-/data/analytics.duckdb}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${POSTGRES_DATABASE:-nova_retail}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_retail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "${INTELLIGENCE_PORT:-8000}:8000"
     volumes:
