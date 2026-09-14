@@ -16,6 +16,12 @@
       "get_sales_summary",
       "get_inventory_risk"
     ],
-    "expected_contains": ["18%", "300,000", "246,000", "inventory"]
+    "expected_contains": ["18%", "300,000", "246,000", "138 days", "inventory"],
+    "expected_tool_arguments": {
+      "get_inventory_risk": {
+        "age_threshold_days": 90,
+        "as_of_date": "2025-09-30"
+      }
+    }
   }
 ]

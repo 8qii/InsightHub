@@ -185,7 +185,10 @@ def test_luna_scenario_uses_knowledge_sales_and_inventory() -> None:
                         ("search_company_knowledge", {"query": "Luna decline"}),
                         ("get_sales_summary", {"product_name": "Product Luna", "quarter": "Q2"}),
                         ("get_sales_summary", {"product_name": "Product Luna", "quarter": "Q3"}),
-                        ("get_inventory_risk", {"age_threshold_days": 90}),
+                        (
+                            "get_inventory_risk",
+                            {"age_threshold_days": 90, "as_of_date": "2025-09-30"},
+                        ),
                     ]
                 ),
                 llm_response("Revenue declined 18% from 300000 to 246000; inventory risk exists.")
@@ -205,6 +208,20 @@ def test_luna_scenario_uses_knowledge_sales_and_inventory() -> None:
         "get_inventory_risk",
     ]
     assert "246000" in result.answer
+
+
+def test_historical_inventory_tool_schema_preserves_snapshot_date() -> None:
+    registry = ToolRegistry(
+        build_tool_definitions(FakeKnowledgeService(), "nova-retail", None)  # type: ignore[arg-type]
+    )
+
+    schema = registry.get("get_inventory_risk")
+
+    assert schema is not None
+    arguments = schema.input_schema.model_validate(
+        {"age_threshold_days": 90, "as_of_date": "2025-09-30"}
+    )
+    assert arguments.as_of_date.isoformat() == "2025-09-30"  # type: ignore[union-attr]
 
 
 def test_agent_endpoint_returns_contract() -> None:

@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query
@@ -47,9 +48,10 @@ async def sales_summary(
 @router.get("/inventory/risk", response_model=list[InventoryRisk])
 async def inventory_risk(
     age_threshold_days: int = Query(..., ge=1, le=3650),  # noqa: B008
+    as_of_date: date | None = Query(default=None),  # noqa: B008
     service: InventoryService = Depends(get_inventory_service),  # noqa: B008
 ) -> list[InventoryRisk]:
-    return await service.get_inventory_risk(age_threshold_days)
+    return await service.get_inventory_risk(age_threshold_days, as_of_date)
 
 
 @router.get("/discount/violations", response_model=DiscountViolations)

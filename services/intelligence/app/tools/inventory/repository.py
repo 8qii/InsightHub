@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from sqlalchemy import Date, cast, func, select
+from sqlalchemy import Date, cast, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.models import Inventory, Product
@@ -10,9 +10,12 @@ class InventoryRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_risk(self, age_threshold_days: int) -> list[tuple[str, int, int]]:
-        age_days = (func.current_date() - cast(Inventory.updated_at, Date)).label("age_days")
-        cutoff = date.today() - timedelta(days=age_threshold_days)
+    async def get_risk(
+        self, age_threshold_days: int, as_of_date: date | None = None
+    ) -> list[tuple[str, int, int]]:
+        effective_date = func.current_date() if as_of_date is None else literal(as_of_date)
+        age_days = (effective_date - cast(Inventory.updated_at, Date)).label("age_days")
+        cutoff = (as_of_date or date.today()) - timedelta(days=age_threshold_days)
         statement = (
             select(Product.name, Inventory.stock_quantity, age_days)
             .join(Inventory, Inventory.product_id == Product.id)

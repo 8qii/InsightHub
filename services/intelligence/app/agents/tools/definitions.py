@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from typing import cast
 
@@ -29,6 +30,10 @@ class SalesToolInput(BaseModel):
 
 class InventoryToolInput(BaseModel):
     age_threshold_days: int = Field(default=90, ge=1, le=3650)
+    as_of_date: date | None = Field(
+        default=None,
+        description="Historical snapshot date. Omit only when current-date analysis is intended.",
+    )
 
 
 class DiscountToolInput(BaseModel):
@@ -63,7 +68,7 @@ def build_tool_definitions(
             raise AppError(503, "database_unavailable", "The data service is not configured.")
         payload = cast(InventoryToolInput, arguments)
         return await InventoryService(InventoryRepository(session)).get_inventory_risk(
-            payload.age_threshold_days
+            payload.age_threshold_days, payload.as_of_date
         )
 
     async def get_discounts(arguments: BaseModel, _: ToolContext) -> DiscountViolations:
