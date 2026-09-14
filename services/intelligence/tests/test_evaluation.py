@@ -201,6 +201,29 @@ def test_evaluator_scores_abstention_and_missing_data() -> None:
     assert evaluation.hallucination_score == 1
 
 
+def test_evaluator_scores_recovered_tool_failure() -> None:
+    case = EvaluationCase(
+        id="recovery",
+        question="Unknown product",
+        expected_tools=["get_sales_summary"],
+        expected_facts=[],
+        expected_sources=[],
+        expected_behavior="recover",
+    )
+    result = AgentResult(
+        answer="The tool failed safely, so I cannot verify the requested revenue.",
+        sources=[],
+        selected_tools=["get_sales_summary"],
+        iterations=2,
+        trace=TraceRecorder("recovery").finish("sales_not_found", True),
+    )
+
+    evaluation = evaluate_case(case, result)
+
+    assert evaluation.failure_recovery_score == 1
+    assert evaluation.passed is True
+
+
 def test_json_logs_filter_secrets_and_content() -> None:
     record = logging.LogRecord("test", logging.INFO, "test.py", 1, "completed", (), None)
     record.api_key = "secret-api-key"

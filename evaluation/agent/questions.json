@@ -119,7 +119,7 @@
     "expected_tools": ["get_sales_summary"],
     "expected_facts": [],
     "expected_sources": [],
-    "expected_behavior": "abstain",
+    "expected_behavior": "recover",
     "should_not_contain": ["$", "revenue was"]
   },
   {

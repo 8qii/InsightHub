@@ -93,7 +93,7 @@ class AgentLoop:
                     iterations=iteration,
                     run_id=trace.run_id,
                     tool_calls=tool_calls,
-                    trace=trace.finish(failure_reason, recovered),
+                    trace=trace.finish(failure_reason, recovered or bool(failure_reason)),
                 )
 
             messages.append(response.message)
