@@ -50,9 +50,30 @@ services:
     networks:
       - insighthub
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-nova_retail}
+      POSTGRES_USER: ${POSTGRES_USER:-nova_retail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nova-retail-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-nova_retail} -d ${POSTGRES_DATABASE:-nova_retail}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - insighthub
+
 volumes:
   anythingllm-storage:
   intelligence-data:
+  nova-retail-postgres-data:
 
 networks:
   insighthub:
