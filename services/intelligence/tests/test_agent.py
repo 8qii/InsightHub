@@ -22,6 +22,7 @@ from app.agents.tools.definitions import (
 )
 from app.errors import AppError
 from app.main import app
+from app.observability.models import AgentTrace, ToolTraceEvent
 from app.tools.discount.models import DiscountViolations
 from app.tools.inventory.models import InventoryRisk
 from app.tools.knowledge.models import KnowledgeQueryResult, KnowledgeSource
@@ -370,6 +371,71 @@ def test_agent_endpoint_returns_contract() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"answer": "180 violations.", "sources": []}
+
+
+def test_agent_run_endpoint_returns_metadata_only() -> None:
+    class FakeAgent:
+        async def query(self, question: str, request_id: str) -> Any:
+            return AgentResult(
+                answer="Revenue declined.",
+                sources=[{"title": "secret-document.md", "excerpt": "private"}],
+                selected_tools=["get_sales_summary"],
+                iterations=1,
+                run_id="run-metadata-test",
+                trace=AgentTrace(
+                    run_id="run-metadata-test",
+                    duration_ms=42.5,
+                    tool_events=[
+                        ToolTraceEvent(
+                            tool_name="get_sales_summary",
+                            duration_ms=12.0,
+                            status="success",
+                        )
+                    ],
+                ),
+            )
+
+    app.state.analyst_agent = FakeAgent()
+    client = TestClient(app)
+    response = client.post("/api/v1/agent/query", json={"question": "Revenue?"})
+
+    assert response.status_code == 200
+    trace_response = client.get("/api/v1/agent/runs/run-metadata-test")
+    assert trace_response.status_code == 200
+    assert trace_response.json() == {
+        "run_id": "run-metadata-test",
+        "status": "completed",
+        "duration_ms": 42.5,
+        "tools": [
+            {"name": "get_sales_summary", "duration_ms": 12.0, "status": "success"}
+        ],
+    }
+    assert "secret-document.md" not in trace_response.text
+    assert client.get("/api/v1/agent/runs/missing").status_code == 404
+
+
+def test_agent_stream_endpoint_emits_answer_and_run_metadata() -> None:
+    class FakeAgent:
+        async def query(self, question: str, request_id: str) -> Any:
+            return AgentResult(
+                answer="Revenue declined 18%.",
+                sources=[{"title": "q3_business_review.md"}],
+                selected_tools=[],
+                iterations=1,
+                run_id="run-stream-test",
+                trace=AgentTrace(run_id="run-stream-test", duration_ms=8.0),
+            )
+
+    app.state.analyst_agent = FakeAgent()
+    response = TestClient(app).post(
+        "/api/v1/agent/query/stream", json={"question": "Why?"}
+    )
+
+    assert response.status_code == 200
+    assert "event: run" in response.text
+    assert '"run_id": "run-stream-test"' in response.text
+    assert '"text": "Revenue declined 18%."' in response.text
+    assert "event: done" in response.text
 
 
 def test_openai_compatible_client_parses_tool_calls() -> None:

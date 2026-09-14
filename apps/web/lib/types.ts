@@ -11,6 +11,19 @@ export type AgentResponse = {
   sources: Citation[];
 };
 
+export type AgentRunTool = {
+  name: string;
+  duration_ms: number;
+  status: string;
+};
+
+export type AgentRun = {
+  run_id: string;
+  status: string;
+  duration_ms: number;
+  tools: AgentRunTool[];
+};
+
 export type SalesSummary = {
   product: string;
   quarter: string;

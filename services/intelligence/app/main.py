@@ -15,6 +15,7 @@ from app.data.database import Database
 from app.errors import register_exception_handlers
 from app.logging import configure_logging
 from app.middleware import request_id_logging_middleware
+from app.observability.runs import default_run_store
 from app.tools.knowledge.client import AnythingLLMClient
 from app.tools.knowledge.service import KnowledgeService
 
@@ -39,6 +40,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     knowledge_service = KnowledgeService(client)
     application.state.knowledge_service = knowledge_service
     application.state.database = database
+    application.state.run_store = default_run_store
     application.state.analyst_agent = AnalystAgent(
         llm=llm_client,
         knowledge_service=knowledge_service,
