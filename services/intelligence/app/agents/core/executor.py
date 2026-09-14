@@ -9,14 +9,21 @@ from pydantic import ValidationError
 from app.agents.core.models import ToolContext, ToolExecutionResult
 from app.agents.core.registry import ToolRegistry
 from app.errors import AppError
+from app.observability.trace import TraceRecorder
 
 logger = logging.getLogger("insighthub.agent")
 
 
 class ToolExecutor:
-    def __init__(self, registry: ToolRegistry, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        registry: ToolRegistry,
+        timeout_seconds: float,
+        trace: TraceRecorder | None = None,
+    ) -> None:
         self._registry = registry
         self._timeout_seconds = timeout_seconds
+        self._trace = trace
 
     async def execute(
         self,
@@ -27,7 +34,14 @@ class ToolExecutor:
         started_at = time.perf_counter()
         definition = self._registry.get(name)
         if definition is None:
-            return ToolExecutionResult(ok=False, error=f"Unknown tool: {name}")
+            result = ToolExecutionResult(ok=False, error=f"Unknown tool: {name}")
+            if self._trace is not None:
+                self._trace.record_tool(
+                    name,
+                    round((time.perf_counter() - started_at) * 1000, 2),
+                    "error",
+                )
+            return result
 
         try:
             arguments = definition.input_schema.model_validate(json.loads(raw_arguments))
@@ -58,10 +72,17 @@ class ToolExecutor:
             extra={
                 "tool_name": name,
                 "request_id": context.request_id,
+                "run_id": context.run_id,
                 "tool_duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
                 "result_status": "success" if tool_result.ok else "error",
             },
         )
+        if self._trace is not None:
+            self._trace.record_tool(
+                name,
+                round((time.perf_counter() - started_at) * 1000, 2),
+                "success" if tool_result.ok else "error",
+            )
         return tool_result
 
 

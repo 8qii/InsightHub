@@ -1,0 +1,105 @@
+{
+  "generated_at": "2026-09-14T12:50:29.203323Z",
+  "summary": {
+    "total_cases": 4,
+    "passed": 4,
+    "failed": 0,
+    "tool_selection_accuracy": 1.0,
+    "fact_match_accuracy": 1.0,
+    "source_match_accuracy": 1.0,
+    "context_accuracy": 1.0,
+    "overall_score": 1.0
+  },
+  "cases": [
+    {
+      "id": "vip-discount-policy",
+      "passed": true,
+      "score": 1.0,
+      "tool_selection_score": 1.0,
+      "fact_score": 1.0,
+      "source_score": 1.0,
+      "context_score": 1.0,
+      "selected_tools": [
+        "search_company_knowledge"
+      ],
+      "matched_facts": [
+        "12%"
+      ],
+      "matched_sources": [
+        "sales_policy.md"
+      ],
+      "context_matches": [],
+      "answer_sha256": "45acbc7f8cc0ed3d2da591a8ef6297a36164107723dc8c0e58b3be4a25221d47",
+      "error": null
+    },
+    {
+      "id": "discount-violations",
+      "passed": true,
+      "score": 1.0,
+      "tool_selection_score": 1.0,
+      "fact_score": 1.0,
+      "source_score": 1.0,
+      "context_score": 1.0,
+      "selected_tools": [
+        "get_discount_violations"
+      ],
+      "matched_facts": [
+        "180"
+      ],
+      "matched_sources": [],
+      "context_matches": [],
+      "answer_sha256": "997710ba3e4c23515ab83444b7f07023d04bb3b9aca6bc72f3bdfe17852039fc",
+      "error": null
+    },
+    {
+      "id": "luna-q3-analysis",
+      "passed": true,
+      "score": 1.0,
+      "tool_selection_score": 1.0,
+      "fact_score": 1.0,
+      "source_score": 1.0,
+      "context_score": 1.0,
+      "selected_tools": [
+        "search_company_knowledge",
+        "get_sales_summary",
+        "get_sales_summary",
+        "get_inventory_risk"
+      ],
+      "matched_facts": [
+        "18%",
+        "$300,000",
+        "$246,000",
+        "138 days"
+      ],
+      "matched_sources": [
+        "q3_business_review.md"
+      ],
+      "context_matches": [
+        "get_inventory_risk.as_of_date"
+      ],
+      "answer_sha256": "10aaa87019e9574633ba4667e6fe11dc4faf2f8d988d7f79b3eedb1e51ef6198",
+      "error": null
+    },
+    {
+      "id": "historical-inventory-analysis",
+      "passed": true,
+      "score": 1.0,
+      "tool_selection_score": 1.0,
+      "fact_score": 1.0,
+      "source_score": 1.0,
+      "context_score": 1.0,
+      "selected_tools": [
+        "get_inventory_risk"
+      ],
+      "matched_facts": [
+        "138 days"
+      ],
+      "matched_sources": [],
+      "context_matches": [
+        "get_inventory_risk.as_of_date"
+      ],
+      "answer_sha256": "c3cb816f00127e47161e3754a9c78d6edeb33307b8351ea25441b92bb97b6209",
+      "error": null
+    }
+  ]
+}

@@ -7,6 +7,7 @@ from app.agents.analyst.agent import AnalystAgent
 from app.agents.core.llm import OpenAICompatibleClient
 from app.api.agent import router as agent_router
 from app.api.data import router as data_router
+from app.api.evaluation import router as evaluation_router
 from app.api.health import router as health_router
 from app.api.knowledge import router as knowledge_router
 from app.config import get_settings
@@ -61,4 +62,5 @@ app.include_router(health_router)
 app.include_router(knowledge_router)
 app.include_router(data_router)
 app.include_router(agent_router)
+app.include_router(evaluation_router)
 register_exception_handlers(app)

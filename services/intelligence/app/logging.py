@@ -29,6 +29,8 @@ class JsonFormatter(logging.Formatter):
             "tool_name",
             "tool_duration_ms",
             "iteration",
+            "run_id",
+            "event_type",
         ):
             value = getattr(record, field, None)
             if value is not None:

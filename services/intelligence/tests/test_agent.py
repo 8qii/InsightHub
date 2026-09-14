@@ -163,7 +163,8 @@ def test_luna_scenario_uses_knowledge_sales_and_inventory() -> None:
             order_count=orders,
         )
 
-    async def inventory_tool(_: Any, __: ToolContext) -> list[InventoryRisk]:
+    async def inventory_tool(arguments: Any, _: ToolContext) -> list[InventoryRisk]:
+        assert arguments.as_of_date.isoformat() == "2025-09-30"
         return [InventoryRisk(product="Product Luna", stock_quantity=12000, age_days=138)]
 
     registry = ToolRegistry(
@@ -187,7 +188,7 @@ def test_luna_scenario_uses_knowledge_sales_and_inventory() -> None:
                         ("get_sales_summary", {"product_name": "Product Luna", "quarter": "Q3"}),
                         (
                             "get_inventory_risk",
-                            {"age_threshold_days": 90, "as_of_date": "2025-09-30"},
+                            {"age_threshold_days": 90},
                         ),
                     ]
                 ),
@@ -197,9 +198,17 @@ def test_luna_scenario_uses_knowledge_sales_and_inventory() -> None:
         registry,
         1,
         3,
+        # Historical agent context supplies the snapshot date when the model omits it.
     )
 
-    result = asyncio.run(loop.run("Why did Product Luna decline?", "luna-test", "Analyst"))
+    result = asyncio.run(
+        loop.run(
+            "Why did Product Luna decline?",
+            "luna-test",
+            "Analyst",
+            default_tool_arguments={"get_inventory_risk": {"as_of_date": "2025-09-30"}},
+        )
+    )
 
     assert result.selected_tools == [
         "search_company_knowledge",

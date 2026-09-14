@@ -8,6 +8,7 @@ from app.agents.core.llm import OpenAICompatibleClient
 from app.agents.core.models import AgentResult, ToolContext
 from app.agents.core.registry import ToolRegistry
 from app.errors import AppError
+from app.observability.trace import TraceRecorder
 
 logger = logging.getLogger("insighthub.agent")
 
@@ -22,36 +23,71 @@ class AgentLoop:
     ) -> None:
         self._llm = llm
         self._registry = registry
-        self._executor = ToolExecutor(registry, tool_timeout_seconds)
+        self._tool_timeout_seconds = tool_timeout_seconds
         self._max_iterations = max_iterations
 
-    async def run(self, question: str, request_id: str, system_prompt: str) -> AgentResult:
+    async def run(
+        self,
+        question: str,
+        request_id: str,
+        system_prompt: str,
+        run_id: str | None = None,
+        default_tool_arguments: dict[str, dict[str, Any]] | None = None,
+    ) -> AgentResult:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question},
         ]
         selected_tools: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
         sources: list[Any] = []
-        context = ToolContext(request_id=request_id)
         started_at = time.perf_counter()
+        trace = TraceRecorder(run_id)
+        context = ToolContext(
+            request_id=request_id,
+            run_id=trace.run_id,
+            default_tool_arguments=default_tool_arguments or {},
+        )
+        executor = ToolExecutor(self._registry, self._tool_timeout_seconds, trace)
 
         for iteration in range(1, self._max_iterations + 1):
             response = await self._llm.complete(messages, self._registry.as_openai_tools())
             if not response.tool_calls:
                 if not response.content or not response.content.strip():
                     raise AppError(502, "agent_empty_answer", "The agent returned an empty answer.")
-                self._log_completion(request_id, selected_tools, started_at, iteration)
+                self._log_completion(
+                    request_id, trace.run_id, selected_tools, started_at, iteration
+                )
                 return AgentResult(
                     answer=response.content.strip(),
                     sources=sources,
                     selected_tools=selected_tools,
                     iterations=iteration,
+                    run_id=trace.run_id,
+                    tool_calls=tool_calls,
+                    trace=trace.finish(),
                 )
 
             messages.append(response.message)
             for tool_call in response.tool_calls:
                 selected_tools.append(tool_call.name)
-                result = await self._executor.execute(tool_call.name, tool_call.arguments, context)
+                tool_calls.append(
+                    {
+                        "name": tool_call.name,
+                        "arguments": _normalized_arguments(
+                            self._registry,
+                            tool_call.name,
+                            _apply_default_arguments(
+                                tool_call.name, tool_call.arguments, context
+                            ),
+                        ),
+                    }
+                )
+                result = await executor.execute(
+                    tool_call.name,
+                    _apply_default_arguments(tool_call.name, tool_call.arguments, context),
+                    context,
+                )
                 if isinstance(result.data, dict) and isinstance(result.data.get("sources"), list):
                     sources.extend(result.data["sources"])
                 messages.append(
@@ -66,15 +102,47 @@ class AgentLoop:
 
     @staticmethod
     def _log_completion(
-        request_id: str, selected_tools: list[str], started_at: float, iteration: int
+        request_id: str,
+        run_id: str,
+        selected_tools: list[str],
+        started_at: float,
+        iteration: int,
     ) -> None:
         logger.info(
             "Agent query completed",
             extra={
                 "request_id": request_id,
+                "run_id": run_id,
                 "selected_tools": selected_tools,
                 "iteration": iteration,
                 "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
                 "result_status": "success",
             },
         )
+
+
+def _normalized_arguments(
+    registry: ToolRegistry, name: str, raw_arguments: str
+) -> dict[str, Any]:
+    definition = registry.get(name)
+    if definition is None:
+        return {}
+    try:
+        return definition.input_schema.model_validate_json(raw_arguments).model_dump(mode="json")
+    except (TypeError, ValueError):
+        return {}
+
+
+def _apply_default_arguments(name: str, raw_arguments: str, context: ToolContext) -> str:
+    defaults = context.default_tool_arguments.get(name)
+    if not defaults:
+        return raw_arguments
+    try:
+        arguments = json.loads(raw_arguments)
+    except json.JSONDecodeError:
+        return raw_arguments
+    if not isinstance(arguments, dict):
+        return raw_arguments
+    for key, value in defaults.items():
+        arguments.setdefault(key, value)
+    return json.dumps(arguments)

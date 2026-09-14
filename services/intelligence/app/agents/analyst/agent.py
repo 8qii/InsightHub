@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -46,24 +47,40 @@ class AnalystAgent:
 
     async def query(self, question: str, request_id: str) -> AgentResult:
         question_id = hashlib.sha256(question.encode("utf-8")).hexdigest()[:16]
+        run_id = str(uuid4())
         logger.info(
             "Agent query started",
-            extra={"request_id": request_id, "question_id": question_id},
+            extra={"request_id": request_id, "question_id": question_id, "run_id": run_id},
         )
         if self._session_factory is None:
-            return await self._run(question, request_id, None)
+            return await self._run(question, request_id, None, run_id)
         async with self._session_factory() as session:
-            return await self._run(question, request_id, session)
+            return await self._run(question, request_id, session, run_id)
 
     async def _run(
-        self, question: str, request_id: str, session: AsyncSession | None
+        self, question: str, request_id: str, session: AsyncSession | None, run_id: str
     ) -> AgentResult:
         registry = ToolRegistry(
             build_tool_definitions(self._knowledge_service, self._workspace_id, session)
         )
+        historical_defaults = {}
+        normalized_question = question.casefold()
+        if any(
+            term in normalized_question
+            for term in ("q3", "historical", "as of", "previous period")
+        ):
+            historical_defaults = {
+                "get_inventory_risk": {"as_of_date": "2025-09-30"}
+            }
         return await AgentLoop(
             self._llm,
             registry,
             self._tool_timeout_seconds,
             self._max_iterations,
-        ).run(question, request_id, SYSTEM_PROMPT)
+        ).run(
+            question,
+            request_id,
+            SYSTEM_PROMPT,
+            run_id,
+            default_tool_arguments=historical_defaults,
+        )

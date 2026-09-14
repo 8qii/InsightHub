@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     max_upload_size_mb: PositiveInt = 100
     duckdb_path: Path = Field(default=Path("/data/analytics.duckdb"))
     evaluation_dataset_path: Path = Field(default=Path("evaluation/datasets"))
+    agent_evaluation_dataset_path: Path = Field(
+        default=Path("evaluation/agent/questions.json")
+    )
+    agent_evaluation_report_path: Path = Field(
+        default=Path("evaluation/agent/reports/latest.json")
+    )
 
 
 @lru_cache

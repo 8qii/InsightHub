@@ -36,6 +36,8 @@ services:
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
       AGENT_TOOL_TIMEOUT_SECONDS: ${AGENT_TOOL_TIMEOUT_SECONDS:-30}
       AGENT_MAX_ITERATIONS: ${AGENT_MAX_ITERATIONS:-6}
+      AGENT_EVALUATION_DATASET_PATH: ${AGENT_EVALUATION_DATASET_PATH:-/app/evaluation/agent/questions.json}
+      AGENT_EVALUATION_REPORT_PATH: ${AGENT_EVALUATION_REPORT_PATH:-/app/evaluation/agent/reports/latest.json}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATA_DIR: ${DATA_DIR:-/app/data}
       DUCKDB_PATH: ${DUCKDB_PATH:-/data/analytics.duckdb}
@@ -50,6 +52,7 @@ services:
       - "${INTELLIGENCE_PORT:-8000}:8000"
     volumes:
       - intelligence-data:${DATA_DIR:-/app/data}
+      - ../evaluation:/app/evaluation
     healthcheck:
       test:
         - CMD

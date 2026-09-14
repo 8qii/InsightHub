@@ -1,26 +1,49 @@
 [
   {
+    "id": "vip-discount-policy",
     "question": "What is the maximum VIP discount allowed?",
     "expected_tools": ["search_company_knowledge"],
-    "expected_contains": ["12%", "discount_policy.md"]
+    "expected_facts": ["12%"],
+    "expected_sources": ["sales_policy.md"],
+    "required_context": {}
   },
   {
+    "id": "discount-violations",
     "question": "How many discount violations happened above the allowed limit?",
     "expected_tools": ["get_discount_violations"],
-    "expected_contains": ["180"]
+    "expected_facts": ["180"],
+    "expected_sources": [],
+    "required_context": {}
   },
   {
+    "id": "luna-q3-analysis",
     "question": "Why did Product Luna revenue decline in Q3?",
     "expected_tools": [
       "search_company_knowledge",
       "get_sales_summary",
       "get_inventory_risk"
     ],
-    "expected_contains": ["18%", "300,000", "246,000", "138 days", "inventory"],
-    "expected_tool_arguments": {
-      "get_inventory_risk": {
-        "age_threshold_days": 90,
-        "as_of_date": "2025-09-30"
+    "expected_facts": ["18%", "$300,000", "$246,000", "138 days"],
+    "expected_sources": ["q3_business_review.md"],
+    "required_context": {
+      "tool_arguments": {
+        "get_inventory_risk": {
+          "as_of_date": "2025-09-30"
+        }
+      }
+    }
+  },
+  {
+    "id": "historical-inventory-analysis",
+    "question": "As of 2025-09-30, how old was Product Luna inventory?",
+    "expected_tools": ["get_inventory_risk"],
+    "expected_facts": ["138 days"],
+    "expected_sources": [],
+    "required_context": {
+      "tool_arguments": {
+        "get_inventory_risk": {
+          "as_of_date": "2025-09-30"
+        }
       }
     }
   }

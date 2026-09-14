@@ -1,13 +1,17 @@
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.observability.models import AgentTrace
 
 
 @dataclass(frozen=True)
 class ToolContext:
     request_id: str
+    run_id: str = ""
+    default_tool_arguments: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 ToolCallable = Callable[[BaseModel, ToolContext], Awaitable[Any]]
@@ -56,3 +60,6 @@ class AgentResult(BaseModel):
     sources: list[Any]
     selected_tools: list[str]
     iterations: int
+    run_id: str = ""
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    trace: AgentTrace | None = None
