@@ -20,14 +20,18 @@ class Settings(BaseSettings):
     app_name: str = "InsightHub Intelligence Service"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
+    intelligence_port: PositiveInt = 8000
 
     anythingllm_base_url: str | None = None
     anythingllm_api_key: str | None = None
     anythingllm_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
 
     llm_provider: str | None = None
+    llm_base_url: str | None = None
     llm_model: str | None = None
     llm_api_key: str | None = None
+    embedding_provider: str | None = None
+    embedding_model: str | None = None
 
     postgres_host: str | None = None
     postgres_port: PositiveInt = 5432
@@ -38,9 +42,12 @@ class Settings(BaseSettings):
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
     langfuse_host: str | None = None
+    langfuse_enabled: bool = False
 
     data_dir: Path = Field(default=Path("./data"))
-    max_upload_size_mb: PositiveInt = 50
+    max_upload_size_mb: PositiveInt = 100
+    duckdb_path: Path = Field(default=Path("/data/analytics.duckdb"))
+    evaluation_dataset_path: Path = Field(default=Path("evaluation/datasets"))
 
 
 @lru_cache

@@ -4,7 +4,7 @@ InsightHub is an enterprise Knowledge & Data Agent for answering business questi
 
 ## Current Phase
 
-Phase 1 adds the AnythingLLM runtime integration and RAG baseline. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, and RAG generation. InsightHub exposes a normalized knowledge query API. Structured-data and agent features are not implemented.
+Phase 1.5 validates the AnythingLLM integration as a real RAG path. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, managed vector storage, and RAG generation. InsightHub exposes a normalized knowledge query API. Structured-data and agent features are not implemented.
 
 ## Architecture
 
@@ -58,13 +58,16 @@ docker compose -f deployment/docker-compose.yml up --build
 
 This starts AnythingLLM at `http://127.0.0.1:3001` and InsightHub at `http://127.0.0.1:8000`.
 
-## Phase 1 AnythingLLM Setup
+## Phase 1.5 AnythingLLM Setup
 
 1. Open `http://127.0.0.1:3001` and complete AnythingLLM's initial setup.
-2. Configure one LLM provider and one embedding provider in AnythingLLM.
-3. Create a workspace and upload a small non-sensitive PDF or DOCX.
-4. Create a Developer API key. The instance API documentation is available at `http://127.0.0.1:3001/api/docs`.
-5. Copy `.env.example` to `.env` and set `ANYTHINGLLM_API_KEY` locally. Never commit `.env`.
+2. Configure the OpenAI-compatible LLM provider using `http://host.docker.internal:8317/v1` and model `gpt-5.6-luna`.
+3. Configure a supported embedding provider and model in AnythingLLM.
+4. Create the `insighthub-demo` workspace and upload the documents in `demo/company/`.
+5. Create a Developer API key. The instance API documentation is available at `http://127.0.0.1:3001/api/docs`.
+6. Copy `.env.example` to `.env` and set `ANYTHINGLLM_API_KEY` locally. Never commit `.env`.
+
+Follow `docs/testing/rag-validation.md` for the two real RAG questions and expected citations.
 
 Query the configured workspace through InsightHub:
 
@@ -86,4 +89,4 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/knowledge/query
 
 ## Configuration
 
-Copy `.env.example` to `.env` and adjust the core application settings as needed. `ANYTHINGLLM_BASE_URL`, `ANYTHINGLLM_API_KEY`, and `ANYTHINGLLM_TIMEOUT_SECONDS` are used by the Phase 1 adapter. The remaining LLM, PostgreSQL, and Langfuse variables remain future placeholders.
+Copy `.env.example` to `.env` and adjust the core application settings as needed. `ANYTHINGLLM_BASE_URL`, `ANYTHINGLLM_API_KEY`, and `ANYTHINGLLM_TIMEOUT_SECONDS` are used by the Phase 1.5 adapter. The LLM and embedding variables document the AnythingLLM provider configuration; the Intelligence service does not make a second model call in this phase.

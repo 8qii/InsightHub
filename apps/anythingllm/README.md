@@ -25,6 +25,25 @@ Compose mounts the named volume `anythingllm-storage` at `/app/server/storage`. 
 5. Create a Developer API key in AnythingLLM.
 6. Put that key in the local, uncommitted `.env` as `ANYTHINGLLM_API_KEY`.
 
+## LLM Setup
+
+Configure the LLM in AnythingLLM's provider settings:
+
+- Provider: `OpenAI Compatible`
+- Base URL: `http://host.docker.internal:8317/v1`
+- Model: `gpt-5.6-luna`
+- API key: configure locally in AnythingLLM; do not commit it
+
+`host.docker.internal` is required when AnythingLLM runs in Docker. `localhost` would refer to the AnythingLLM container itself, not the host machine where the OpenAI-compatible endpoint is running.
+
+The Compose file also maps the canonical `.env.example` values `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` to AnythingLLM's `generic-openai` environment settings. This makes a non-interactive local setup reproducible; the values remain blank in the committed template.
+
+## Embedding Setup
+
+Configure embeddings in AnythingLLM before uploading documents. The default Phase 1.5 setup uses AnythingLLM's managed native embedder with model `Xenova/all-MiniLM-L6-v2`. The Compose file maps `EMBEDDING_MODEL` to AnythingLLM's `EMBEDDING_MODEL_PREF` setting. If the model is changed, select a supported provider and model in the installed version's embedding settings, then wait for indexing to complete.
+
+Record the actual embedding provider and model used for a validation run in the report described by `docs/testing/rag-validation.md`. The embedding model must be compatible with the selected provider and must not be assumed to be `gpt-5.6-luna`.
+
 ## Developer API Contract Used
 
 The adapter uses the v1.16.1 Developer API:

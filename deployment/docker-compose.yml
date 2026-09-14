@@ -4,6 +4,12 @@ services:
     cap_add:
       - SYS_ADMIN
     environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-generic-openai}
+      GENERIC_OPEN_AI_BASE_PATH: ${LLM_BASE_URL:-}
+      GENERIC_OPEN_AI_API_KEY: ${LLM_API_KEY:-}
+      GENERIC_OPEN_AI_MODEL_PREF: ${LLM_MODEL:-gpt-5.6-luna}
+      EMBEDDING_ENGINE: ${ANYTHINGLLM_EMBEDDING_ENGINE:-native}
+      EMBEDDING_MODEL_PREF: ${EMBEDDING_MODEL:-Xenova/all-MiniLM-L6-v2}
       STORAGE_DIR: /app/server/storage
     ports:
       - "3001:3001"
@@ -17,13 +23,14 @@ services:
       context: ../services/intelligence
       dockerfile: Dockerfile
     environment:
+      APP_NAME: ${APP_NAME:-insighthub}
       APP_ENV: ${APP_ENV:-development}
       ANYTHINGLLM_BASE_URL: ${ANYTHINGLLM_BASE_URL:-http://anythingllm:3001}
       ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY:-}
-      ANYTHINGLLM_TIMEOUT_SECONDS: ${ANYTHINGLLM_TIMEOUT_SECONDS:-30}
+      ANYTHINGLLM_TIMEOUT_SECONDS: ${ANYTHINGLLM_TIMEOUT_SECONDS:-60}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATA_DIR: /app/data
-      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
     ports:
       - "8000:8000"
     volumes:
