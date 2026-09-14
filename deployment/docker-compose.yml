@@ -1,10 +1,26 @@
 services:
+  anythingllm:
+    image: mintplexlabs/anythingllm:1.16.1@sha256:05617e7bece7fd6eddc4f5b4176cd87fff74d7da88d988a6109b95481cce122c
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      STORAGE_DIR: /app/server/storage
+    ports:
+      - "3001:3001"
+    volumes:
+      - anythingllm-storage:/app/server/storage
+    networks:
+      - insighthub
+
   intelligence:
     build:
       context: ../services/intelligence
       dockerfile: Dockerfile
     environment:
       APP_ENV: ${APP_ENV:-development}
+      ANYTHINGLLM_BASE_URL: ${ANYTHINGLLM_BASE_URL:-http://anythingllm:3001}
+      ANYTHINGLLM_API_KEY: ${ANYTHINGLLM_API_KEY:-}
+      ANYTHINGLLM_TIMEOUT_SECONDS: ${ANYTHINGLLM_TIMEOUT_SECONDS:-30}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DATA_DIR: /app/data
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
@@ -22,6 +38,13 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - insighthub
 
 volumes:
+  anythingllm-storage:
   intelligence-data:
+
+networks:
+  insighthub:
+    driver: bridge

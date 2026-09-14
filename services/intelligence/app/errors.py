@@ -16,7 +16,6 @@ class AppError(Exception):
         self.code = code
         self.message = message
 
-
 def error_response(status_code: int, code: str, message: str, request: Request) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     body: dict[str, Any] = {

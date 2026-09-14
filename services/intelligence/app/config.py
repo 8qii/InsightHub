@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     anythingllm_base_url: str | None = None
     anythingllm_api_key: str | None = None
+    anythingllm_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
 
     llm_provider: str | None = None
     llm_model: str | None = None
