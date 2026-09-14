@@ -4,7 +4,7 @@ InsightHub is an enterprise Knowledge & Data Agent for answering business questi
 
 ## Current Phase
 
-Phase 4 adds a lightweight AI Analyst Agent. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, managed vector storage, and knowledge retrieval. InsightHub owns the bounded agent loop, typed business tools, PostgreSQL access, citations, and evaluation.
+Phase 6 adds a Next.js web analyst interface. AnythingLLM owns document ingestion, indexing, embeddings, workspace management, managed vector storage, and knowledge retrieval. InsightHub owns the bounded agent loop, typed business tools, PostgreSQL access, citations, evaluation, and the web product experience.
 
 ## Architecture
 
@@ -24,6 +24,10 @@ FastAPI Intelligence Service
 ```
 
 AnythingLLM remains an external OSS component; InsightHub does not fork its internals.
+
+## Screenshots
+
+Screenshots will be added after the first hosted demo capture.
 
 ## Local Setup
 
@@ -64,7 +68,18 @@ Run the Phase 1 stack from the repository root:
 docker compose --env-file .env -f deployment/docker-compose.yml up --build
 ```
 
-This starts AnythingLLM at `http://127.0.0.1:3001` and InsightHub at `http://127.0.0.1:8000`.
+This starts the web analyst at `http://127.0.0.1:3000`, AnythingLLM at `http://127.0.0.1:3001`, and InsightHub at `http://127.0.0.1:8000`.
+
+The web application can also be run independently:
+
+```bash
+cd apps/web
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Open `http://localhost:3000`. Use `/dashboard` for the executive overview. The frontend talks to the FastAPI service through its typed API client and does not contain provider credentials.
 
 ## Phase 1.5 AnythingLLM Setup
 

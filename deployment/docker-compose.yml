@@ -68,6 +68,22 @@ services:
     networks:
       - insighthub
 
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://intelligence:8000}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://intelligence:8000}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      intelligence:
+        condition: service_healthy
+    networks:
+      - insighthub
+
   postgres:
     image: postgres:16
     environment:

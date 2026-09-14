@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #17212b;
+  --muted: #687684;
+  --paper: #f5f7f8;
+  --line: #dbe2e7;
+  --teal: #087f7b;
+  --teal-dark: #075e5b;
+  --amber: #c78028;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button, input { font: inherit; }
+
+.prose-analyst p { margin: 0 0 1rem; }
+.prose-analyst p:last-child { margin-bottom: 0; }
+.prose-analyst ul, .prose-analyst ol { margin: .75rem 0 1rem 1.25rem; }
+.prose-analyst li { margin: .35rem 0; }
+.prose-analyst table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+.prose-analyst th, .prose-analyst td { border: 1px solid var(--line); padding: .65rem .75rem; text-align: left; }
+.prose-analyst th { background: #eef3f4; font-weight: 700; }
+.prose-analyst code { background: #edf1f2; border-radius: .25rem; padding: .15rem .3rem; font-size: .88em; }
+.prose-analyst pre { overflow-x: auto; border-radius: .5rem; background: #17212b; color: #edf4f3; padding: 1rem; margin: 1rem 0; }
+.prose-analyst pre code { background: none; padding: 0; }
