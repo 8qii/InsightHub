@@ -24,6 +24,11 @@ class JsonFormatter(logging.Formatter):
             "upstream_duration_ms",
             "source_count",
             "result_status",
+            "question_id",
+            "selected_tools",
+            "tool_name",
+            "tool_duration_ms",
+            "iteration",
         ):
             value = getattr(record, field, None)
             if value is not None:
