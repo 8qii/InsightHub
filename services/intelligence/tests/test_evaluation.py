@@ -153,6 +153,7 @@ def test_evaluation_response_schema_contains_summary() -> None:
         context_accuracy=1,
         hallucination_score=1,
         abstention_score=1,
+        clarification_accuracy=1,
         failure_recovery_score=1,
         overall_score=1,
     )
@@ -221,6 +222,31 @@ def test_evaluator_scores_recovered_tool_failure() -> None:
     evaluation = evaluate_case(case, result)
 
     assert evaluation.failure_recovery_score == 1
+    assert evaluation.passed is True
+
+
+def test_evaluator_scores_clarification_guidance() -> None:
+    case = EvaluationCase(
+        id="ambiguous",
+        question="How is sales?",
+        expected_tools=[],
+        expected_facts=[],
+        expected_sources=[],
+        expected_behavior="clarify",
+    )
+    result = AgentResult(
+        answer=(
+            "I need more context. Please specify:\n"
+            "- time period\n- product or customer\n- metric"
+        ),
+        sources=[],
+        selected_tools=[],
+        iterations=0,
+    )
+
+    evaluation = evaluate_case(case, result)
+
+    assert evaluation.clarification_score == 1
     assert evaluation.passed is True
 
 

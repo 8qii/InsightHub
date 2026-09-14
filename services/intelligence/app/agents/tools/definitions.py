@@ -37,7 +37,12 @@ class InventoryToolInput(BaseModel):
 
 
 class DiscountToolInput(BaseModel):
-    maximum_discount: Decimal = Field(default=Decimal("12"), ge=0, le=100)
+    threshold_percent: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Optional discount threshold percent. Omit to use the 12% policy default.",
+    )
 
 
 def build_tool_definitions(
@@ -75,32 +80,50 @@ def build_tool_definitions(
         if session is None:
             raise AppError(503, "database_unavailable", "The data service is not configured.")
         payload = cast(DiscountToolInput, arguments)
+        threshold = (
+            Decimal(str(payload.threshold_percent))
+            if payload.threshold_percent is not None
+            else None
+        )
         return await DiscountService(DiscountRepository(session)).get_discount_violations(
-            payload.maximum_discount
+            threshold
         )
 
     return [
         ToolDefinition(
             name="search_company_knowledge",
-            description="Search company documents and return an answer with source citations.",
+            description=(
+                "Use for company policies, document facts, and citations. "
+                "Input: query text. Example: query='VIP discount policy'."
+            ),
             input_schema=KnowledgeToolInput,
             execute=search_knowledge,
         ),
         ToolDefinition(
             name="get_sales_summary",
-            description="Get revenue and order count for a product and quarter.",
+            description=(
+                "Use for numeric revenue and order counts when product and quarter are known. "
+                "Inputs: product_name and quarter='Q1'|'Q2'|'Q3'|'Q4'. "
+                "Example: Product Luna, Q3."
+            ),
             input_schema=SalesToolInput,
             execute=get_sales,
         ),
         ToolDefinition(
             name="get_inventory_risk",
-            description="Find products whose inventory age is at or above the requested threshold.",
+            description=(
+                "Use for inventory age risk. Input age_threshold_days; optionally provide "
+                "as_of_date for historical snapshots. Example: 90 days as of 2025-09-30."
+            ),
             input_schema=InventoryToolInput,
             execute=get_inventory,
         ),
         ToolDefinition(
             name="get_discount_violations",
-            description="Count orders above the permitted discount and the unapproved subset.",
+            description=(
+                "Use to count discount violations. Optional threshold_percent overrides the "
+                "12% policy default; omit it for the policy threshold. Example: 10.0."
+            ),
             input_schema=DiscountToolInput,
             execute=get_discounts,
         ),

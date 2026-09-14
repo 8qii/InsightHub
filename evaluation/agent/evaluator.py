@@ -31,6 +31,7 @@ class CaseEvaluation(BaseModel):
     context_score: float
     hallucination_score: float
     abstention_score: float
+    clarification_score: float
     failure_recovery_score: float
     selected_tools: list[str]
     matched_facts: list[str]
@@ -51,6 +52,7 @@ class EvaluationSummary(BaseModel):
     context_accuracy: float
     hallucination_score: float
     abstention_score: float
+    clarification_accuracy: float
     failure_recovery_score: float
     overall_score: float
 
@@ -90,6 +92,7 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
         len(case.should_not_contain) - len(forbidden_matches), len(case.should_not_contain)
     )
     abstention_score = _abstention_score(case.expected_behavior, answer)
+    clarification_score = _clarification_score(case.expected_behavior, answer)
     failure_recovery_score = _recovery_score(case.expected_behavior, result)
     tool_score = float(set(selected_tools) == set(case.expected_tools))
     fact_score = _ratio(len(matched_facts), len(case.expected_facts))
@@ -104,9 +107,10 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
             + context_score
             + hallucination_score
             + abstention_score
+            + clarification_score
             + failure_recovery_score
         )
-        / 7,
+        / 8,
         4,
     )
     return CaseEvaluation(
@@ -119,6 +123,7 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
             and context_score == 1
             and hallucination_score == 1
             and abstention_score == 1
+            and clarification_score == 1
             and failure_recovery_score == 1
         ),
         score=score,
@@ -128,6 +133,7 @@ def evaluate_case(case: EvaluationCase, result: Any) -> CaseEvaluation:
         context_score=context_score,
         hallucination_score=hallucination_score,
         abstention_score=abstention_score,
+        clarification_score=clarification_score,
         failure_recovery_score=failure_recovery_score,
         selected_tools=selected_tools,
         matched_facts=matched_facts,
@@ -150,6 +156,7 @@ def failed_case(case: EvaluationCase, error: str) -> CaseEvaluation:
         context_score=0,
         hallucination_score=0,
         abstention_score=0,
+        clarification_score=0,
         failure_recovery_score=0,
         selected_tools=[],
         matched_facts=[],
@@ -172,9 +179,8 @@ def summarize(cases: list[CaseEvaluation]) -> EvaluationSummary:
         source_match_accuracy=_average(case.source_score for case in cases),
         context_accuracy=_average(case.context_score for case in cases),
         hallucination_score=_average(case.hallucination_score for case in cases),
-        abstention_score=_scoped_average(
-            cases, {"abstain", "clarify", "missing_information"}, "abstention_score"
-        ),
+        abstention_score=_scoped_average(cases, {"abstain", "missing_information"}, "abstention_score"),
+        clarification_accuracy=_scoped_average(cases, {"clarify"}, "clarification_score"),
         failure_recovery_score=_scoped_average(cases, {"recover"}, "failure_recovery_score"),
         overall_score=_average(case.score for case in cases),
     )
@@ -196,20 +202,26 @@ def _contains(answer: str, fact: str) -> bool:
 
 
 def _abstention_score(expected_behavior: str, answer: str) -> float:
-    if expected_behavior not in {"abstain", "clarify", "missing_information"}:
+    if expected_behavior not in {"abstain", "missing_information"}:
         return 1.0
     markers = (
         "cannot",
         "can't",
         "do not have",
         "don't have",
+        "don't have information",
+        "no information about",
         "not available",
         "unable",
         "insufficient",
         "not found",
         "no information",
+        "no specific",
         "no data",
         "no sales data",
+        "no policy",
+        "not covered",
+        "do not cover",
         "not provided",
         "not specified",
         "does not specify",
@@ -221,7 +233,20 @@ def _abstention_score(expected_behavior: str, answer: str) -> float:
         "which quarter",
         "which period",
     )
-    return float(any(marker in answer.casefold() for marker in markers))
+    normalized = answer.casefold()
+    return float(
+        any(marker in normalized for marker in markers)
+        or re.search(r"\b(no|not)\b.{0,40}\b(available|found|covered|specific|source)\b", normalized)
+        is not None
+    )
+
+
+def _clarification_score(expected_behavior: str, answer: str) -> float:
+    if expected_behavior != "clarify":
+        return 1.0
+    normalized = answer.casefold()
+    required = ("time period", "product or customer", "metric")
+    return float("more context" in normalized and all(item in normalized for item in required))
 
 
 def _recovery_score(expected_behavior: str, result: Any) -> float:

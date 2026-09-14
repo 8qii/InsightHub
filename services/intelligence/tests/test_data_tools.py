@@ -11,6 +11,7 @@ from app.api.data import (
 )
 from app.main import app
 from app.tools.discount.models import DiscountViolations
+from app.tools.discount.service import DiscountService
 from app.tools.inventory.models import InventoryRisk
 from app.tools.sales.models import SalesSummary
 
@@ -46,8 +47,10 @@ class HistoricalInventoryService:
 
 
 class FakeDiscountService:
-    async def get_discount_violations(self, maximum_discount: Decimal) -> DiscountViolations:
-        assert maximum_discount == Decimal("12")
+    async def get_discount_violations(
+        self, threshold_percent: Decimal | None
+    ) -> DiscountViolations:
+        assert threshold_percent in {None, Decimal("10")}
         return DiscountViolations(total_violations=180, unapproved_violations=120)
 
 
@@ -106,13 +109,25 @@ def test_discount_endpoint_returns_expected_violations() -> None:
     app.dependency_overrides[get_discount_service] = FakeDiscountService
     try:
         response = TestClient(app).get(
-            "/api/v1/data/discount/violations", params={"maximum_discount": "12"}
+            "/api/v1/data/discount/violations"
         )
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == {"total_violations": 180, "unapproved_violations": 120}
+
+
+def test_discount_endpoint_accepts_custom_threshold() -> None:
+    app.dependency_overrides[get_discount_service] = FakeDiscountService
+    try:
+        response = TestClient(app).get(
+            "/api/v1/data/discount/violations", params={"threshold_percent": "10"}
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
 
 
 def test_data_endpoints_validate_parameters() -> None:
@@ -133,7 +148,7 @@ def test_data_endpoints_validate_parameters() -> None:
             params={"age_threshold_days": 90, "as_of_date": "not-a-date"},
         ).status_code == 422
         assert client.get(
-            "/api/v1/data/discount/violations", params={"maximum_discount": 101}
+            "/api/v1/data/discount/violations", params={"threshold_percent": 101}
         ).status_code == 422
     finally:
         app.dependency_overrides.clear()
@@ -143,3 +158,19 @@ def test_services_are_awaitable() -> None:
     assert asyncio.iscoroutinefunction(FakeSalesService.get_sales_summary)
     assert asyncio.iscoroutinefunction(FakeInventoryService.get_inventory_risk)
     assert asyncio.iscoroutinefunction(FakeDiscountService.get_discount_violations)
+
+
+def test_discount_service_uses_policy_default_or_custom_threshold() -> None:
+    thresholds: list[Decimal] = []
+
+    class Repository:
+        async def get_violations(self, threshold: Decimal) -> tuple[int, int]:
+            thresholds.append(threshold)
+            return 180, 120
+
+    service = DiscountService(Repository())  # type: ignore[arg-type]
+
+    asyncio.run(service.get_discount_violations())
+    asyncio.run(service.get_discount_violations(Decimal("10")))
+
+    assert thresholds == [Decimal("12"), Decimal("10")]

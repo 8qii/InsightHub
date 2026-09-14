@@ -11,9 +11,12 @@ class DiscountService:
     def __init__(self, repository: DiscountRepository) -> None:
         self.repository = repository
 
-    async def get_discount_violations(self, maximum_discount: Decimal) -> DiscountViolations:
+    async def get_discount_violations(
+        self, threshold_percent: Decimal | None = None
+    ) -> DiscountViolations:
+        threshold = threshold_percent if threshold_percent is not None else Decimal("12")
         try:
-            total, unapproved = await self.repository.get_violations(maximum_discount)
+            total, unapproved = await self.repository.get_violations(threshold)
         except SQLAlchemyError as exc:
             raise AppError(503, "database_unavailable", "The data service is unavailable.") from exc
         return DiscountViolations(

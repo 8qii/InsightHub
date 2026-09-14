@@ -56,7 +56,8 @@ async def inventory_risk(
 
 @router.get("/discount/violations", response_model=DiscountViolations)
 async def discount_violations(
-    maximum_discount: Decimal = Query(..., ge=0, le=100),  # noqa: B008
+    threshold_percent: float | None = Query(default=None, ge=0, le=100),  # noqa: B008
     service: DiscountService = Depends(get_discount_service),  # noqa: B008
 ) -> DiscountViolations:
-    return await service.get_discount_violations(maximum_discount)
+    threshold = Decimal(str(threshold_percent)) if threshold_percent is not None else None
+    return await service.get_discount_violations(threshold)

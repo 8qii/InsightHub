@@ -91,7 +91,7 @@
     "should_not_contain": ["12%"],
     "required_context": {
       "tool_arguments": {
-        "get_discount_violations": {"maximum_discount": 10}
+        "get_discount_violations": {"threshold_percent": 10}
       }
     }
   },
@@ -121,6 +121,24 @@
     "expected_sources": [],
     "expected_behavior": "recover",
     "should_not_contain": ["$", "revenue was"]
+  },
+  {
+    "id": "ambiguous-sales-context",
+    "question": "How is sales?",
+    "expected_tools": [],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "clarify",
+    "should_not_contain": ["$300,000", "$246,000", "12%"]
+  },
+  {
+    "id": "ambiguous-product-context",
+    "question": "How is Product Luna?",
+    "expected_tools": [],
+    "expected_facts": [],
+    "expected_sources": [],
+    "expected_behavior": "clarify",
+    "should_not_contain": ["$300,000", "$246,000", "138 days"]
   },
   {
     "id": "ambiguous-sales-question",
@@ -212,5 +230,19 @@
     "expected_sources": ["q3_business_review.md"],
     "expected_behavior": "answer",
     "should_not_contain": ["sales_policy.md"]
+  },
+  {
+    "id": "discount-default-threshold",
+    "question": "How many orders violated the default discount policy?",
+    "expected_tools": ["get_discount_violations"],
+    "expected_facts": ["180"],
+    "expected_sources": [],
+    "expected_behavior": "answer",
+    "should_not_contain": ["10%"],
+    "required_context": {
+      "tool_arguments": {
+        "get_discount_violations": {"threshold_percent": null}
+      }
+    }
   }
 ]

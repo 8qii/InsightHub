@@ -9,6 +9,7 @@ from app.agents.core.loop import AgentLoop
 from app.agents.core.models import AgentResult
 from app.agents.core.registry import ToolRegistry
 from app.agents.tools.definitions import build_tool_definitions
+from app.observability.trace import TraceRecorder
 from app.tools.knowledge.service import KnowledgeService
 
 logger = logging.getLogger("insighthub.agent")
@@ -27,6 +28,8 @@ Never invent numbers, policies, sources, or tool results. If a tool fails, expla
 If a question is ambiguous or missing a required product, quarter, or time period,
 ask a concise clarification question instead of guessing.
 If the available sources do not contain the requested information, say that it cannot be verified.
+For a requested future or unsupported period, state explicitly that no information is
+available for that period.
 Give a concise answer with the relevant numbers and cite document source titles when available.
 """
 
@@ -59,6 +62,16 @@ class AnalystAgent:
             "Agent query started",
             extra={"request_id": request_id, "question_id": question_id, "run_id": run_id},
         )
+        clarification = build_clarification(question)
+        if clarification is not None:
+            return AgentResult(
+                answer=clarification,
+                sources=[],
+                selected_tools=[],
+                iterations=0,
+                run_id=run_id,
+                trace=TraceRecorder(run_id).finish(),
+            )
         if self._session_factory is None:
             return await self._run(question, request_id, None, run_id)
         async with self._session_factory() as session:
@@ -93,3 +106,66 @@ class AnalystAgent:
             run_id,
             default_tool_arguments=historical_defaults,
         )
+
+
+def build_clarification(question: str) -> str | None:
+    """Reject vague analytics requests before they trigger unsupported guesses."""
+    normalized = question.casefold()
+    analytics_terms = (
+        "sales",
+        "revenue",
+        "performance",
+        "perform",
+        "orders",
+        "inventory",
+        "discount",
+        "profit",
+        "product",
+        "customer",
+        "luna",
+    )
+    vague_phrases = ("how is", "how did", "tell me about", "what happened")
+    if not any(term in normalized for term in analytics_terms):
+        return None
+    has_entity = any(
+        marker in normalized
+        for marker in ("product ", "customer ", "luna", "vip", "region ")
+    )
+    has_metric = any(
+        metric in normalized
+        for metric in ("sales", "revenue", "orders", "inventory", "discount", "profit")
+    )
+    has_time_period = any(
+        marker in normalized
+        for marker in (
+            "q1",
+            "q2",
+            "q3",
+            "q4",
+            "quarter",
+            "year",
+            "month",
+            "week",
+            "today",
+            "current",
+            "historical",
+            "2025",
+        )
+    )
+    is_vague_question = any(phrase in normalized for phrase in vague_phrases)
+    is_missing_sales_period = (
+        has_entity
+        and not has_time_period
+        and any(metric in normalized for metric in ("sales", "revenue"))
+        and any(prefix in normalized for prefix in ("what was", "what is", "how many"))
+    )
+    if not is_vague_question and not is_missing_sales_period:
+        return None
+    if has_entity and has_metric and has_time_period:
+        return None
+    return (
+        "I need more context. Please specify:\n"
+        "- time period\n"
+        "- product or customer\n"
+        "- metric"
+    )

@@ -7,7 +7,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.agents.analyst.agent import AnalystAgent
+from app.agents.analyst.agent import AnalystAgent, build_clarification
 from app.agents.core.executor import ToolExecutor
 from app.agents.core.llm import OpenAICompatibleClient
 from app.agents.core.loop import AgentLoop
@@ -88,6 +88,18 @@ def test_agent_uses_knowledge_tool_and_returns_sources() -> None:
     assert result.answer.endswith("12%.")
     assert result.selected_tools == ["search_company_knowledge"]
     assert result.sources[0]["title"] == "discount_policy.md"
+
+
+def test_ambiguous_questions_return_clarification_guidance_without_tools() -> None:
+    for question in ("How is sales?", "How is Product Luna?"):
+        answer = build_clarification(question)
+
+        assert answer is not None
+        assert "time period" in answer
+        assert "product or customer" in answer
+        assert "metric" in answer
+
+    assert build_clarification("What was Product Luna revenue in Q3?") is None
 
 
 def test_tool_executor_returns_safe_failure_for_invalid_arguments() -> None:
@@ -230,7 +242,7 @@ def test_discount_scenario_uses_discount_tool() -> None:
     loop = AgentLoop(
         FakeLLM(
             [
-                llm_response(calls=[("get_discount_violations", {"maximum_discount": 12})]),
+                llm_response(calls=[("get_discount_violations", {"threshold_percent": 12})]),
                 llm_response("There were 180 violations.")
             ]
         ),
@@ -327,6 +339,18 @@ def test_historical_inventory_tool_schema_preserves_snapshot_date() -> None:
         {"age_threshold_days": 90, "as_of_date": "2025-09-30"}
     )
     assert arguments.as_of_date.isoformat() == "2025-09-30"  # type: ignore[union-attr]
+
+
+def test_discount_tool_accepts_custom_and_default_thresholds() -> None:
+    registry = ToolRegistry(
+        build_tool_definitions(FakeKnowledgeService(), "nova-retail", None)  # type: ignore[arg-type]
+    )
+
+    schema = registry.get("get_discount_violations")
+
+    assert schema is not None
+    assert schema.input_schema.model_validate({}).threshold_percent is None
+    assert schema.input_schema.model_validate({"threshold_percent": 10.0}).threshold_percent == 10.0
 
 
 def test_agent_endpoint_returns_contract() -> None:

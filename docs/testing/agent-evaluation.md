@@ -12,7 +12,7 @@ The deterministic dataset is `evaluation/agent/questions.json`. Each case define
 - `should_not_contain`, used for deterministic hallucination checks
 - `required_context`, including tool arguments such as historical `as_of_date`
 
-The 21 cases cover normal answers, ambiguous questions, missing information, tool failures, policy conflicts, and citation behavior.
+The dataset covers normal answers, ambiguous questions, missing information, tool failures, policy conflicts, custom/default thresholds, and citation behavior.
 
 ## Metrics
 
@@ -24,8 +24,9 @@ The 21 cases cover normal answers, ambiguous questions, missing information, too
 - Context accuracy: deterministic match for required tool arguments.
 - Hallucination score: one minus the ratio of forbidden answer phrases found.
 - Abstention score: checks for an explicit limitation or clarification when evidence is missing.
+- Clarification accuracy: checks that vague requests receive time period, product/customer, and metric guidance.
 - Failure recovery score: checks whether a tool failure was followed by a successful tool result.
-- Overall score: the mean of all seven case-level scores.
+- Overall score: the mean of all eight case-level scores.
 
 No LLM judge is used.
 
