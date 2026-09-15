@@ -1,8 +1,10 @@
 import asyncio
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy.dialects import postgresql
 
 from app.api.data import (
     get_discount_service,
@@ -11,8 +13,11 @@ from app.api.data import (
 )
 from app.main import app
 from app.tools.discount.models import DiscountViolations
+from app.tools.discount.repository import DiscountRepository
 from app.tools.discount.service import DiscountService
-from app.tools.inventory.models import InventoryRisk, InventorySnapshotSummary
+from app.tools.inventory.models import InventoryExposure, InventoryRisk, InventorySnapshotSummary
+from app.tools.inventory.repository import InventoryRepository
+from app.tools.inventory.service import InventoryService
 from app.tools.sales.models import ReturnsSummary, SalesPerformance, SalesSummary
 
 
@@ -303,3 +308,90 @@ def test_discount_service_uses_policy_default_or_custom_threshold() -> None:
     asyncio.run(service.get_discount_violations(Decimal("10")))
 
     assert thresholds == [Decimal("12"), Decimal("10")]
+
+
+def test_discount_service_passes_optional_reporting_period() -> None:
+    periods: list[tuple[date | None, date | None]] = []
+
+    class Repository:
+        async def get_violations(
+            self,
+            threshold: Decimal,
+            start_date: date | None = None,
+            end_date: date | None = None,
+        ) -> tuple[int, int]:
+            assert threshold == Decimal("12")
+            periods.append((start_date, end_date))
+            return 20, 10
+
+    service = DiscountService(Repository())  # type: ignore[arg-type]
+    result = asyncio.run(
+        service.get_discount_violations(
+            start_date=date(2025, 7, 1), end_date=date(2025, 10, 1)
+        )
+    )
+
+    assert periods == [(date(2025, 7, 1), date(2025, 10, 1))]
+    assert result.total_violations == 20
+
+
+def test_inventory_service_returns_aged_unit_exposure() -> None:
+    class Repository:
+        async def get_exposure(
+            self, age_threshold_days: int, as_of_date: date
+        ) -> tuple[int, int, int]:
+            assert (age_threshold_days, as_of_date) == (90, date(2025, 9, 30))
+            return 4, 18000, 138
+
+    service = InventoryService(Repository())  # type: ignore[arg-type]
+    result = asyncio.run(service.get_inventory_exposure(90, date(2025, 9, 30)))
+
+    assert result == InventoryExposure(
+        product_count=4, stock_quantity=18000, oldest_age_days=138
+    )
+
+
+def test_overview_repository_queries_enforce_period_and_aged_stock() -> None:
+    statements: list[Any] = []
+
+    class Row:
+        product_count = 0
+        stock_quantity = 0
+        oldest_age_days = 0
+
+    class Result:
+        def scalar_one(self) -> int:
+            return 0
+
+        def one(self) -> Row:
+            return Row()
+
+    class Session:
+        async def execute(self, statement: object) -> Result:
+            statements.append(statement)
+            return Result()
+
+    discount_repository = DiscountRepository(Session())  # type: ignore[arg-type]
+    inventory_repository = InventoryRepository(Session())  # type: ignore[arg-type]
+
+    asyncio.run(
+        discount_repository.get_violations(
+            Decimal("12"), date(2025, 7, 1), date(2025, 10, 1)
+        )
+    )
+    asyncio.run(inventory_repository.get_exposure(90, date(2025, 9, 30)))
+
+    discount_sql = str(
+        statements[0].compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    inventory_sql = str(
+        statements[2].compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "orders.order_date >= '2025-07-01'" in discount_sql
+    assert "orders.order_date < '2025-10-01'" in discount_sql
+    assert "inventory_snapshots.received_at < '2025-07-02'" in inventory_sql
+    assert "inventory_snapshots.on_hand_quantity > 0" in inventory_sql

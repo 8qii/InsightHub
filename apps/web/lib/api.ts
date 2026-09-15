@@ -3,6 +3,8 @@ import type {
   AgentRun,
   DiscountViolations,
   InventoryRisk,
+  Investigation,
+  Overview,
   SalesSummary,
 } from "./types";
 
@@ -24,11 +26,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       headers: { "Content-Type": "application/json", ...init?.headers },
     });
     const body = (await response.json().catch(() => null)) as
-      | { detail?: string }
+      | { detail?: string; error?: { message?: string } }
       | null;
 
     if (!response.ok) {
-      const error = new Error(body?.detail ?? `Request failed (${response.status})`) as Error & {
+      const error = new Error(body?.detail ?? body?.error?.message ?? `Request failed (${response.status})`) as Error & {
         status?: number;
       };
       error.status = response.status;
@@ -139,4 +141,66 @@ export async function getDiscountViolations(): Promise<DiscountViolations> {
   const value = objectResponse(await request<unknown>("/api/v1/data/discount/violations"), "The discount API returned an invalid response.");
   if (typeof value.total_violations !== "number" || typeof value.unapproved_violations !== "number") throw new Error("The discount API returned an incomplete response.");
   return value as unknown as DiscountViolations;
+}
+
+function isNumberValue(value: unknown): value is number | string {
+  return typeof value === "number" || (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)));
+}
+
+function hasStringFields(value: unknown, fields: string[]): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return fields.every((field) => typeof record[field] === "string");
+}
+
+function fieldIsOneOf(value: unknown, field: string, allowed: string[]): boolean {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && allowed.includes(String((value as Record<string, unknown>)[field])));
+}
+
+function isDateString(value: unknown): value is string {
+  return typeof value === "string"
+    && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+}
+
+export async function getOverview(): Promise<Overview> {
+  const value = objectResponse(await request<unknown>("/api/v1/overview"), "The overview API returned an invalid response.");
+  const summary = value.summary && typeof value.summary === "object" && !Array.isArray(value.summary)
+    ? value.summary as Record<string, unknown>
+    : null;
+  if (
+    typeof value.period !== "string"
+    || typeof value.scope !== "string"
+    || !isDateString(value.as_of_date)
+    || !summary
+    || !isNumberValue(summary.net_revenue)
+    || !isNumberValue(summary.gross_margin)
+    || !isNumberValue(summary.gross_margin_rate)
+    || !isNumberValue(summary.return_rate)
+    || typeof summary.inventory_risk_products !== "number"
+    || typeof summary.inventory_risk_units !== "number"
+    || !Array.isArray(value.signals) || !value.signals.every((item) => hasStringFields(item, ["signal_id", "severity", "title", "summary", "metric"]) && fieldIsOneOf(item, "severity", ["high", "medium", "low"]))
+    || !Array.isArray(value.drivers) || !value.drivers.every((item) => hasStringFields(item, ["driver", "status", "summary", "metric"]) && fieldIsOneOf(item, "driver", ["Sales", "Returns", "Discounts", "Inventory"]) && fieldIsOneOf(item, "status", ["positive", "watch", "risk"]))
+    || !Array.isArray(value.evidence) || !value.evidence.every((item) => hasStringFields(item, ["source_type", "role", "title", "detail"]) && fieldIsOneOf(item, "source_type", ["document", "database", "metric"]) && fieldIsOneOf(item, "role", ["supporting_context", "metric_source"]))
+    || !Array.isArray(value.investigations) || !value.investigations.every((item) => hasStringFields(item, ["question", "rationale"]))
+  ) throw new Error("The overview API returned an incomplete response.");
+  return value as unknown as Overview;
+}
+
+export async function getInvestigation(investigationId: string): Promise<Investigation> {
+  const value = objectResponse(await request<unknown>(`/api/v1/investigations/${encodeURIComponent(investigationId)}`), "The investigation API returned an invalid response.");
+  if (
+    typeof value.investigation_id !== "string"
+    || typeof value.title !== "string"
+    || typeof value.period !== "string"
+    || !isDateString(value.as_of_date)
+    || typeof value.executive_summary !== "string"
+    || typeof value.conclusion !== "string"
+    || typeof value.impact !== "string"
+    || !Array.isArray(value.findings) || !value.findings.every((item) => hasStringFields(item, ["title", "summary", "metric", "severity"]) && fieldIsOneOf(item, "severity", ["high", "medium", "low"]))
+    || !Array.isArray(value.drivers) || !value.drivers.every((item) => hasStringFields(item, ["area", "status", "summary", "metric"]) && fieldIsOneOf(item, "area", ["Demand", "Returns", "Inventory", "Business context"]) && fieldIsOneOf(item, "status", ["positive", "watch", "risk"]))
+    || !Array.isArray(value.evidence) || !value.evidence.every((item) => hasStringFields(item, ["observed_on", "source_type", "role", "title", "detail"]) && isDateString((item as Record<string, unknown>).observed_on) && fieldIsOneOf(item, "source_type", ["document", "database", "metric"]) && fieldIsOneOf(item, "role", ["supporting_context", "metric_source"]))
+    || !Array.isArray(value.suggested_questions) || !value.suggested_questions.every((item) => hasStringFields(item, ["question", "rationale"]))
+  ) throw new Error("The investigation API returned an incomplete response.");
+  return value as unknown as Investigation;
 }

@@ -19,3 +19,9 @@ class InventorySnapshotSummary(BaseModel):
     reserved_quantity: int
     available_quantity: int
     age_days: int
+
+
+class InventoryExposure(BaseModel):
+    product_count: int
+    stock_quantity: int
+    oldest_age_days: int

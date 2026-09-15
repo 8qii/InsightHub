@@ -2,110 +2,85 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DiscountChart } from "@/components/charts/discount-chart";
-import { RevenueChart } from "@/components/charts/revenue-chart";
-import { MetricCard } from "@/components/intelligence/metric-card";
+import { InsightHero } from "@/components/intelligence/insight-hero";
 import { AppShell } from "@/components/layout/app-shell";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SectionLabel } from "@/components/ui/section-header";
 import { Spinner } from "@/components/ui/spinner";
-import { getDiscountViolations, getInventoryRisk, getSalesSummary } from "@/lib/api";
-import type { DiscountViolations, InventoryRisk, SalesSummary } from "@/lib/types";
+import { getOverview } from "@/lib/api";
+import { createOverviewPresentation } from "@/lib/intelligence-presentation";
+import type { Overview } from "@/lib/types";
 
-function money(value: number | string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
+function displayDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 }
 
+const severityStyles = {
+  high: "border-danger text-danger",
+  medium: "border-warning text-warning-strong",
+  low: "border-brand text-brand",
+};
+
+const evidenceTypeStyles = {
+  document: "bg-warning",
+  database: "bg-brand",
+  metric: "bg-ink-soft",
+};
+
 export function DashboardView() {
-  const [sales, setSales] = useState<SalesSummary | null>(null);
-  const [trend, setTrend] = useState<SalesSummary[]>([]);
-  const [inventory, setInventory] = useState<InventoryRisk[] | null>(null);
-  const [discounts, setDiscounts] = useState<DiscountViolations | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const briefing = overview ? createOverviewPresentation(overview) : null;
 
   useEffect(() => {
-    Promise.all([
-      getSalesSummary("Product Luna", "Q3"),
-      getSalesSummary("Product Luna", "Q2"),
-      getInventoryRisk(90),
-      getDiscountViolations(),
-    ])
-      .then(([q3, q2, inventoryData, discountData]) => {
-        setSales(q3);
-        setTrend([q2, q3]);
-        setInventory(inventoryData);
-        setDiscounts(discountData);
-      })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : "Dashboard data is unavailable."))
+    getOverview()
+      .then(setOverview)
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Executive overview is unavailable."))
       .finally(() => setLoading(false));
   }, []);
 
-  const oldest = inventory?.reduce((max, item) => Math.max(max, item.age_days), 0) ?? 0;
-
   return (
-    <AppShell page="Overview" scope="Product Luna">
-      <main className="w-full">
-        <div className="mb-8 flex flex-col justify-between gap-5 border-b border-line pb-6 sm:flex-row sm:items-end">
+    <AppShell page="Overview" scope={briefing?.scope ?? "Loading"}>
+      <main className="w-full space-y-14">
+        <header className="flex flex-col justify-between gap-6 border-b border-line pb-7 lg:flex-row lg:items-end">
           <div>
-            <div className="mb-3 text-label font-bold uppercase tracking-label text-brand">Executive overview · Q3</div>
-            <h1 className="text-4xl font-semibold tracking-heading text-ink">Business pulse</h1>
-            <p className="mt-3 text-muted">A concise view of the metrics currently available to InsightHub.</p>
+            <Badge tone="brand" compact className="mb-4 uppercase tracking-eyebrow"><span className="size-1.5 rounded-full bg-brand" />Executive intelligence briefing</Badge>
+            <h1 className="text-3xl font-semibold tracking-heading text-ink sm:text-4xl">{briefing ? `${briefing.company} executive briefing` : "Executive intelligence briefing"}</h1>
           </div>
-          <div className="rounded-control border border-line bg-surface px-4 py-3 text-sm text-muted">
-            Scope: <strong className="text-ink">Product Luna · Q2 / Q3</strong>
-          </div>
-        </div>
+          <div className="border-l-2 border-brand pl-4 text-sm"><div className="text-label font-bold uppercase tracking-label text-brand">{briefing?.preparationStatus ?? "Analyst preparing"}</div><div className="mt-1 font-semibold text-ink">{briefing ? displayDate(briefing.asOfDate) : "Reviewing sources"}</div><div className="mt-1 text-xs text-muted">{briefing ? `${briefing.period} · ${briefing.evidenceCount} evidence source${briefing.evidenceCount === 1 ? "" : "s"}` : "Building the executive report"}</div></div>
+        </header>
 
-        {loading ? <div className="mb-6 flex items-center gap-3 rounded-control border border-brand-border bg-brand-soft p-4 text-sm text-brand"><Spinner /> Loading live business data...</div> : null}
-        {error ? <div role="alert" className="mb-6 rounded-control border border-danger-border bg-danger-soft p-4 text-sm text-danger">{error}</div> : null}
+        {loading ? <section aria-live="polite" className="border-y border-line py-8"><div className="flex items-center gap-3 text-sm font-semibold text-ink"><Spinner /> Analyst is preparing your briefing</div><div className="mt-5 grid gap-3 text-sm text-muted sm:grid-cols-3"><div className="border-l-2 border-brand pl-3">Reviewing reporting context</div><div className="border-l-2 border-line-strong pl-3">Linking source evidence</div><div className="border-l-2 border-line-strong pl-3">Preparing recommendations</div></div></section> : null}
+        {error ? <div role="alert" className="border-l-2 border-danger bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div> : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Q3 revenue" value={sales ? money(sales.revenue) : "—"} detail={sales ? `${sales.product} · ${sales.quarter}` : "Awaiting sales API"} />
-          <MetricCard label="Orders" value={sales ? sales.order_count.toLocaleString() : "—"} detail="Recorded in selected period" />
-          <MetricCard label="Risky products" value={inventory ? inventory.length.toLocaleString() : "—"} detail="Inventory older than 90 days" tone="warning" />
-          <MetricCard label="Policy violations" value={discounts ? discounts.total_violations.toLocaleString() : "—"} detail={discounts ? `${discounts.unapproved_violations} unapproved` : "Awaiting policy API"} tone="warning" />
-        </div>
+        {briefing ? <>
+          {briefing.insight ? <InsightHero insight={briefing.insight} /> : <EmptyState title="No executive finding requires attention." description="The analyst reviewed the available signals and did not identify a prioritized observation for this reporting period." className="border-solid bg-surface-subtle p-6" />}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          {trend.length === 2 ? <RevenueChart values={trend} formatValue={money} /> : null}
-          {discounts ? <DiscountChart values={discounts} /> : null}
-        </div>
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
-          <Card className="p-6">
-            <SectionLabel>Inventory watchlist</SectionLabel>
-            {inventory?.length ? (
-              <div className="divide-y divide-line">
-                {inventory.map((item) => (
-                  <div className="flex items-center justify-between gap-4 py-4" key={item.product}>
-                    <div>
-                      <div className="font-semibold text-ink-soft">{item.product}</div>
-                      <div className="mt-1 text-sm text-muted">{item.stock_quantity.toLocaleString()} units in stock</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-warning-strong">{item.age_days}</div>
-                      <div className="text-label font-bold uppercase tracking-label text-muted">age</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : <EmptyState title="No aging inventory returned." />}
-          </Card>
-
-          <Card className="p-6">
-            <SectionLabel>Signal notes</SectionLabel>
-            <div className="space-y-5">
-              <div>
-                <div className="text-sm font-semibold text-ink">Oldest inventory</div>
-                <div className="mt-1 text-3xl font-semibold text-warning-strong">{oldest || "—"}<span className="ml-1 text-base font-normal text-muted">days</span></div>
-              </div>
-              <div className="border-t border-surface-muted pt-5 text-sm leading-6 text-muted">Use the analyst to connect these operational signals with policy and company knowledge.</div>
-              <Link href="/" className="inline-block text-sm font-bold text-brand">Open a cross-source question →</Link>
+          <section className="grid gap-8 border-b border-line pb-12 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div><div className="text-label font-bold uppercase tracking-label text-brand">Evidence relationship</div><h2 className="mt-3 text-2xl font-semibold tracking-heading text-ink">Finding to evidence</h2><p className="mt-2 text-sm leading-6 text-muted">The conclusion is grounded in explicitly classified source relationships.</p></div>
+            <div className="border-l border-line pl-5">
+              <div className="text-sm font-semibold text-ink">Finding: {briefing.evidenceRelationship.finding}</div>
+              {briefing.evidenceRelationship.supportingEvidence.length ? <ol className="mt-5 space-y-4">
+                {briefing.evidenceRelationship.supportingEvidence.map((evidence) => <li className="grid gap-3 sm:grid-cols-[130px_minmax(0,1fr)]" key={evidence.id}><div className="flex items-start gap-3 text-[10px] font-bold uppercase tracking-eyebrow text-muted"><span className={`mt-1 size-2 rounded-full ${evidenceTypeStyles[evidence.sourceType]}`} />{evidence.sourceLabel}</div><div><div className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><div className="text-sm font-semibold text-ink">{evidence.title}</div><div className="text-[10px] font-bold uppercase tracking-eyebrow text-muted">{evidence.roleLabel}</div></div><p className="mt-1 text-sm leading-6 text-muted">{evidence.detail}</p></div></li>)}
+              </ol> : <EmptyState title="No evidence sources are available." description="The next briefing will show linked document, database, or metric evidence when it is available." className="mt-5" />}
             </div>
-          </Card>
-        </div>
+          </section>
+
+          <section className="grid gap-8 border-b border-line pb-12 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div><div className="text-label font-bold uppercase tracking-label text-brand">Supporting context</div><h2 className="mt-3 text-2xl font-semibold tracking-heading text-ink">Business measures</h2><p className="mt-2 text-sm leading-6 text-muted">Context for the briefing, not a dashboard to interpret.</p></div>
+            <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-4">{briefing.metrics.map((metric) => <div className="border-l border-line pl-4" key={metric.label}><dt className="text-label font-bold uppercase tracking-label text-muted">{metric.label}</dt><dd className="mt-2 text-xl font-semibold tracking-heading text-ink">{metric.value}</dd><div className="mt-1 text-xs leading-5 text-muted">{metric.detail}</div></div>)}</dl>
+          </section>
+
+          <section className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <div><div className="text-label font-bold uppercase tracking-label text-brand">Attention queue</div><h2 className="mt-3 text-2xl font-semibold tracking-heading text-ink">Decisions waiting for follow-up</h2><p className="mt-2 text-sm leading-6 text-muted">Each situation includes its current impact and a direct route to investigate.</p></div>
+            {briefing.attention.length ? <ol className="divide-y divide-line border-y border-line">{briefing.attention.map((item) => <li className="grid gap-5 py-6 md:grid-cols-[110px_minmax(0,1fr)_180px] md:items-start" key={item.id}><div><span className={`inline-flex border-l-2 pl-2 text-[10px] font-bold uppercase tracking-eyebrow ${severityStyles[item.severity]}`}>{item.severity}</span></div><div><h3 className="text-lg font-semibold tracking-heading text-ink">{item.title}</h3><p className="mt-2 text-sm leading-6 text-muted">{item.observation}</p><div className="mt-3 text-xs font-semibold text-muted">{item.evidenceCount} linked evidence source{item.evidenceCount === 1 ? "" : "s"}</div></div><div className="md:text-right"><div className="text-sm font-bold text-ink">{item.impact}</div><Link href={item.actionHref} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-brand hover:text-brand-strong focus-visible:outline-none focus-visible:shadow-focus">{item.action} <span aria-hidden="true">-&gt;</span></Link></div></li>)}</ol> : <EmptyState title="No follow-up decisions are waiting." description="The analyst did not find a signal requiring an immediate investigation." className="border-solid bg-surface-subtle" />}
+          </section>
+        </> : null}
       </main>
     </AppShell>
   );

@@ -72,3 +72,25 @@ class InventoryRepository:
             (row[0], row[1], row[2], int(row[3]), int(row[4]), int(row[5]), int(row[6]))
             for row in rows
         ]
+
+    async def get_exposure(
+        self, age_threshold_days: int, as_of_date: date
+    ) -> tuple[int, int, int]:
+        age_days = literal(as_of_date) - InventorySnapshot.received_at
+        statement = (
+            select(
+                func.count(func.distinct(InventorySnapshot.product_id)).label("product_count"),
+                func.coalesce(func.sum(InventorySnapshot.on_hand_quantity), 0).label(
+                    "stock_quantity"
+                ),
+                func.coalesce(func.max(age_days), 0).label("oldest_age_days"),
+            )
+            .where(
+                InventorySnapshot.snapshot_date == as_of_date,
+                InventorySnapshot.received_at
+                < as_of_date - timedelta(days=age_threshold_days),
+                InventorySnapshot.on_hand_quantity > 0,
+            )
+        )
+        row = (await self.session.execute(statement)).one()
+        return int(row.product_count), int(row.stock_quantity), int(row.oldest_age_days)

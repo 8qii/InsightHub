@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,11 +13,19 @@ class DiscountService:
         self.repository = repository
 
     async def get_discount_violations(
-        self, threshold_percent: Decimal | None = None
+        self,
+        threshold_percent: Decimal | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> DiscountViolations:
         threshold = threshold_percent if threshold_percent is not None else Decimal("12")
         try:
-            total, unapproved = await self.repository.get_violations(threshold)
+            if start_date is None and end_date is None:
+                total, unapproved = await self.repository.get_violations(threshold)
+            else:
+                total, unapproved = await self.repository.get_violations(
+                    threshold, start_date, end_date
+                )
         except SQLAlchemyError as exc:
             raise AppError(503, "database_unavailable", "The data service is unavailable.") from exc
         return DiscountViolations(

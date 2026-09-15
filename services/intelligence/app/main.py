@@ -9,7 +9,9 @@ from app.api.agent import router as agent_router
 from app.api.data import router as data_router
 from app.api.evaluation import router as evaluation_router
 from app.api.health import router as health_router
+from app.api.investigations import router as investigations_router
 from app.api.knowledge import router as knowledge_router
+from app.api.overview import router as overview_router
 from app.config import get_settings
 from app.data.database import Database
 from app.errors import register_exception_handlers
@@ -65,6 +67,8 @@ app.middleware("http")(request_id_logging_middleware)
 app.include_router(health_router)
 app.include_router(knowledge_router)
 app.include_router(data_router)
+app.include_router(overview_router)
+app.include_router(investigations_router)
 app.include_router(agent_router)
 app.include_router(evaluation_router)
 register_exception_handlers(app)

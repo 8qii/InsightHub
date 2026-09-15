@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:presentation": "tsx --test lib/intelligence-presentation/overview.test.ts lib/investigation-workflow/workflow.test.ts"
   },
   "dependencies": {
     "next": "^16.0.0",
@@ -23,6 +24,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
     "tailwindcss": "^4.1.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.0"
   }
 }

@@ -4,7 +4,7 @@
 
 The design system provides a stable visual and component foundation for the Next.js application in `apps/web`. It supports an enterprise intelligence workspace without coupling generic UI primitives to backend contracts or page-specific business logic.
 
-Phase 10.0 established the primitive foundation. Phase 10.1 adds the enterprise application shell without changing API behavior or business logic.
+Phase 10.0 established the primitive foundation. Phase 10.1 added the enterprise application shell, and Phase 10.4.5 refined hierarchy and surface depth without changing API behavior or business logic.
 
 ## Design Principles
 
@@ -28,6 +28,34 @@ apps/web/components/
 ```
 
 Dependency direction should generally flow from feature components to intelligence/layout components and then to UI primitives. Generic UI components must not import feature or API modules.
+
+The intelligence workspace uses focused presentation components:
+
+- `DriverAnalysis`: functional assessment across Sales, Returns, Discounts, and Inventory
+- `InvestigationCard`: suggested follow-up question and its decision rationale
+- `InvestigationView`: a bounded signal workspace with conclusion, drivers, evidence, and follow-up questions
+- `FindingCard`, `DriverBreakdown`, `EvidenceTimeline`, and `QuestionSuggestion`: investigation-specific presentations that keep calculated inputs separate from supporting context
+- `InsightHero`, `ConfidenceIndicator`, `EvidenceSummary`, and `RecommendationBlock`: reusable analyst-report elements for the executive briefing
+- `InvestigationStatusIndicator` and `InvestigationActivityTimeline`: workflow elements for lifecycle state and chronological decision milestones
+
+The Overview intentionally uses a briefing document structure rather than generic intelligence cards. It owns the single `/api/v1/overview` request and its loading and error states.
+
+The Overview does not render API contracts directly. `apps/web/lib/intelligence-presentation/` converts the stable Overview response into `InsightPresentation`, `AttentionItemPresentation`, and `EvidenceRelationshipPresentation` contracts. This layer owns narrative ordering, evidence relationships, display formatting, and action destinations while leaving backend and agent contracts unchanged.
+
+Overview reading order is insight-first:
+
+```text
+Insight hero
+  -> finding-to-evidence relationship
+  -> supporting context
+  -> attention queue
+```
+
+Metrics provide context after the conclusion and should not lead the page or require the reader to infer the primary finding.
+
+The executive briefing header is derived from the presentation layer: its company context uses the API-provided scope, while period, evidence count, and preparation status are computed from the Overview response. Loading and empty states should describe the analyst workflow, such as reviewing context and linking evidence, rather than showing generic dashboard placeholders.
+
+The Signals workspace uses Overview signals as its server-provided queue and stores only workflow state in browser-local persistence. Investigation status, opens, completed analysis, and status changes are local interaction records; they do not modify source data or imply authenticated ownership.
 
 ## Application Shell
 
@@ -95,13 +123,24 @@ Tailwind's base spacing scale remains valid for local layout. Add a named spacin
 - `rounded-control`: form controls, notices, and nested panels
 - `rounded-card`: primary container radius
 - `shadow-card`: low-elevation panel shadow
+- `shadow-editorial`: restrained elevation for primary briefing and decision surfaces
 - `shadow-focus`: brand focus treatment
+
+### Surface Hierarchy
+
+Use three visual levels to prevent every section from carrying equal weight:
+
+1. **Primary editorial surface**: page introductions, priority signals, and investigation conclusions. Use `Card` with `tone="editorial"`, a restrained semantic accent, and `shadow-editorial` only when the content should lead the reading order.
+2. **Information card**: metrics, findings, and actionable pathways. Use the default `Card` treatment with a concise accent, strong title, and clear interpretation or action.
+3. **Utility/supporting card**: evidence, structured driver rows, traces, and secondary context. Use `tone="utility"` so these elements remain readable without competing with decisions.
+
+Status color communicates meaning rather than decoration. Teal marks current or positive information, amber marks watch conditions, and red marks material risk. Avoid applying tinted backgrounds to entire page regions unless the region is intentionally editorial.
 
 ## Primitive Usage
 
 ### Card
 
-`Card` is the default elevated content container. It renders a semantic `section`, accepts standard HTML attributes, and supports `default` and `brand` tones. Use `className` for layout and spacing rather than conflicting color overrides.
+`Card` is the default content container. It renders a semantic `section`, accepts standard HTML attributes, and supports `default`, `brand`, `editorial`, and `utility` tones. Use `editorial` sparingly for conclusions and priority content; use `utility` for supporting evidence and structured context.
 
 ```tsx
 import { Card } from "@/components/ui/card";

@@ -16,9 +16,9 @@ import { ExecutionStatus } from "./execution-status";
 import { TraceTimeline } from "./trace-timeline";
 
 const suggestedQuestions = [
-  "Why did Product Luna revenue decline in Q3?",
-  "What is the maximum VIP discount allowed?",
-  "Which products have aging inventory?",
+  "Which business signal requires the most attention?",
+  "What policy exceptions require review?",
+  "Where is inventory exposure concentrated?",
 ];
 
 export function AnalystChat() {
@@ -71,7 +71,7 @@ export function AnalystChat() {
           <Card className="overflow-hidden">
             <form onSubmit={submit} className="p-5 sm:p-7">
               <SectionLabel>Analyst question</SectionLabel>
-              <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Why did Product Luna revenue decline in Q3?" rows={4} className="w-full resize-none rounded-control border border-line-strong bg-surface-subtle p-4 text-base text-ink outline-none transition placeholder:text-placeholder focus:border-brand focus:shadow-focus" aria-label="Analyst question" />
+              <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What decision should leadership investigate next?" rows={4} className="w-full resize-none rounded-control border border-line-strong bg-surface-subtle p-4 text-base text-ink outline-none transition placeholder:text-placeholder focus:border-brand focus:shadow-focus" aria-label="Analyst question" />
               <div className="mt-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="flex flex-wrap gap-2">{suggestedQuestions.map((suggestion) => <Button variant="secondary" size="sm" key={suggestion} onClick={() => setQuestion(suggestion)}>{suggestion}</Button>)}</div>
                 <Button type="submit" disabled={!question.trim() || loading} className="shrink-0">{loading && <Spinner />}{loading ? "Analyzing" : "Run analysis"}</Button>

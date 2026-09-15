@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.errors import AppError
-from app.tools.inventory.models import InventoryRisk, InventorySnapshotSummary
+from app.tools.inventory.models import InventoryExposure, InventoryRisk, InventorySnapshotSummary
 from app.tools.inventory.repository import InventoryRepository
 
 
@@ -37,3 +37,18 @@ class InventoryService:
             )
             for row in rows
         ]
+
+    async def get_inventory_exposure(
+        self, age_threshold_days: int, as_of_date: date
+    ) -> InventoryExposure:
+        try:
+            product_count, stock_quantity, oldest_age_days = await self.repository.get_exposure(
+                age_threshold_days, as_of_date
+            )
+        except SQLAlchemyError as exc:
+            raise AppError(503, "database_unavailable", "The data service is unavailable.") from exc
+        return InventoryExposure(
+            product_count=product_count,
+            stock_quantity=stock_quantity,
+            oldest_age_days=oldest_age_days,
+        )

@@ -90,6 +90,8 @@ Start with the questions in [the demo script](demo/demo-script.md), especially t
 | `POST` | `/api/v1/agent/query` | JSON agent response |
 | `POST` | `/api/v1/agent/query/stream` | SSE answer delivery |
 | `GET` | `/api/v1/agent/runs/{run_id}` | Metadata-only execution trace |
+| `GET` | `/api/v1/overview` | Curated executive intelligence overview |
+| `GET` | `/api/v1/investigations/{id}` | Curated signal investigation workspace |
 | `GET` | `/api/v1/data/sales/summary` | Sales summary |
 | `GET` | `/api/v1/data/inventory/risk` | Aging inventory |
 | `GET` | `/api/v1/data/discount/violations` | Discount controls |
