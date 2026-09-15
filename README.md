@@ -1,56 +1,67 @@
 # InsightHub
 
-InsightHub is an enterprise AI analyst for answering business questions across company knowledge and structured data. It combines document retrieval, read-only business tools, citations, evaluation, and an executive web interface in one understandable deployment.
+InsightHub is a professional knowledge and data analyst for teams whose answers are split across company documents and operational data. It combines retrieval-backed policy evidence, read-only business metrics, citations, evaluation, and a traceable web experience in one deployable system.
 
-## Product Overview
+The included Nova Retail Distribution dataset demonstrates the central business problem: answer a question that requires both a policy document and transactional evidence, without asking a user to reconcile separate systems by hand.
 
-Ask questions such as:
+## The Showcase
 
-> Why did Product Luna revenue decline in Q3?
+> What is the maximum VIP discount, how much Q3 VIP revenue did we generate, and how many orders violated the policy?
 
-InsightHub can connect the Q3 business review, sales summaries, and historical inventory risk to produce an answer with source citations and a sanitized execution trace. It is built around the fictional Nova Retail Distribution business so cross-source facts remain coherent and demonstrable.
+InsightHub retrieves the 12% policy cap from the knowledge base, gets Q3 VIP revenue of $3,137,371.50 from PostgreSQL-backed business tools, and identifies 180 discount events above the cap, including 120 unapproved violations. The answer includes policy citations and a sanitized trace of the tools used.
 
-## Architecture
+See the full [Nova Retail demo script](demo/demo-script.md).
 
-```text
-Browser
-   |
-Next.js Web Analyst
-   |  same-origin proxy, SSE, Markdown, charts
-   v
-FastAPI Intelligence Service
-   |\
-   | \-- Bounded AI Analyst Agent
-   |     |-- Knowledge Search -> AnythingLLM
-   |     |-- Sales Analytics -> PostgreSQL
-   |     |-- Inventory Risk -> PostgreSQL
-   |     \-- Discount Controls -> PostgreSQL
-   |
-   \-- Metadata-only Run Trace API
+## Solution Architecture
+
+```mermaid
+flowchart LR
+    User[Business user] --> Web[Next.js analyst and dashboard]
+    Web -->|Same-origin proxy, JSON, SSE| API[FastAPI intelligence service]
+    API --> Agent[Bounded analyst agent]
+    Agent --> Knowledge[Knowledge adapter]
+    Knowledge --> RAG[AnythingLLM: ingestion, embeddings, RAG]
+    Agent --> Sales[Typed sales tool]
+    Agent --> Inventory[Typed inventory tool]
+    Agent --> Discount[Typed discount tool]
+    Sales --> DB[(PostgreSQL)]
+    Inventory --> DB
+    Discount --> DB
+    API --> Trace[Metadata-only trace store]
+    Evaluation[Deterministic evaluation] --> Agent
 ```
 
-AnythingLLM remains an external OSS component. InsightHub does not fork its internals. The custom engineering boundary is the FastAPI intelligence service, typed tools, read-only data access, evaluation system, observability metadata, and web product.
+AnythingLLM is used as an external OSS RAG component, not forked. InsightHub owns the FastAPI intelligence boundary, agent orchestration, typed data tools, read-only safety controls, evaluation, trace metadata, and product UI. Read the [architecture overview](docs/architecture/overview.md) for component details.
+
+## Technical Highlights
+
+- One bounded tool-calling orchestrator with explicit typed contracts instead of a distributed multi-agent system.
+- RAG-backed answers and citations for policies and business documents via AnythingLLM.
+- Typed PostgreSQL business tools with read-only access boundaries, validation, and no browser-provided SQL.
+- Server Sent Events for progressive answer rendering while preserving the existing JSON API.
+- Metadata-only traces showing run status, selected tools, and durations without prompts, document content, credentials, or database rows.
+- Focused executive dashboard with lightweight CSS charts and no heavy BI dependency.
+- Docker Compose topology designed for a modest single-host deployment.
+
+## Evaluation Results
+
+The tracked deterministic evaluation report records **24/24 passing cases** and a **1.00 overall score**. It validates tool selection, facts, citations, required historical context, hallucination guards, abstention, clarification, and failure recovery. It does not depend on an LLM judge.
+
+The report is reproducible from the repository root:
+
+```bash
+python evaluation/agent/runner.py
+```
+
+See [agent evaluation documentation](docs/testing/agent-evaluation.md) and the tracked [latest report](evaluation/agent/reports/latest.json).
 
 ## Screenshots
 
-Screenshots are reserved for the hosted demo capture:
+Real demo captures are intentionally not fabricated or checked in. Capture guidance is reserved for:
 
-```text
-[ Analyst chat screenshot placeholder ]
-[ Executive dashboard screenshot placeholder ]
-```
-
-## Engineering Highlights
-
-- Bounded tool-calling agent with explicit typed contracts.
-- RAG for policy and business documents through AnythingLLM.
-- Read-only PostgreSQL business services with SQL safety boundaries.
-- Metadata-only agent traces with run IDs, tool durations, and status.
-- Server Sent Events for progressive answer delivery without breaking the JSON API.
-- Deterministic evaluation dataset covering routing, facts, sources, clarification, and recovery.
-- Lightweight CSS dashboard charts without a heavy BI dependency.
-- Docker Compose deployment suitable for a modest VPS.
-- No provider credentials or database secrets in the frontend.
+- [Analyst chat](docs/screenshots/chat.md)
+- [Executive dashboard](docs/screenshots/dashboard.md)
+- [Execution trace](docs/screenshots/trace.md)
 
 ## Local Demo
 
@@ -61,42 +72,36 @@ cp .env.example .env
 docker compose --env-file .env -f deployment/docker-compose.yml up --build
 ```
 
+Configure `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and `ANYTHINGLLM_API_KEY` in the uncommitted `.env`, then make sure the Nova Retail documents are indexed in the configured AnythingLLM workspace.
+
 Open:
 
-- Web analyst: `http://localhost:3000`
+- Analyst: `http://localhost:3000`
 - Executive dashboard: `http://localhost:3000/dashboard`
-- FastAPI health: `http://localhost:8000/health/live`
+- API health: `http://localhost:8000/health/live`
 - AnythingLLM: `http://localhost:3001`
 
-Configure `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and `ANYTHINGLLM_API_KEY` in the uncommitted `.env`. Never commit `.env`.
-
-Try:
-
-```text
-Why did Product Luna revenue decline in Q3?
-```
-
-Expected evidence includes an 18% decline from `$300,000` in Q2 to `$246,000` in Q3, 138-day inventory, and a `q3_business_review.md` citation.
+Start with the questions in [the demo script](demo/demo-script.md), especially the mixed policy and compliance question.
 
 ## API Surface
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/agent/query` | Existing JSON agent contract |
+| `POST` | `/api/v1/agent/query` | JSON agent response |
 | `POST` | `/api/v1/agent/query/stream` | SSE answer delivery |
 | `GET` | `/api/v1/agent/runs/{run_id}` | Metadata-only execution trace |
 | `GET` | `/api/v1/data/sales/summary` | Sales summary |
 | `GET` | `/api/v1/data/inventory/risk` | Aging inventory |
 | `GET` | `/api/v1/data/discount/violations` | Discount controls |
 
-## Quality Checks
+## Validation
 
 Backend, from `services/intelligence`:
 
 ```bash
+pytest
 ruff check .
 mypy app
-pytest
 ```
 
 Frontend, from `apps/web`:
@@ -107,11 +112,10 @@ npm run lint
 npm run build
 ```
 
-Compose validation:
+Docker Compose:
 
 ```bash
 docker compose --env-file .env -f deployment/docker-compose.yml config
-docker compose --env-file .env -f deployment/docker-compose.yml up --build
 ```
 
-See [production deployment](docs/deployment/production.md) and the [case study](docs/case-study.md) for architecture, operations, and tradeoffs.
+See [production deployment](docs/deployment/production.md), the [case study](docs/case-study.md), and the [freelance customization brief](docs/freelance-pitch.md) for deployment, engineering tradeoffs, and engagement options.
