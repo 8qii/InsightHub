@@ -1,27 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { DiscountChart } from "@/components/charts/discount-chart";
+import { RevenueChart } from "@/components/charts/revenue-chart";
+import { MetricCard } from "@/components/intelligence/metric-card";
+import { AppShell } from "@/components/layout/app-shell";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionLabel } from "@/components/ui/section-header";
+import { Spinner } from "@/components/ui/spinner";
 import { getDiscountViolations, getInventoryRisk, getSalesSummary } from "@/lib/api";
 import type { DiscountViolations, InventoryRisk, SalesSummary } from "@/lib/types";
-import { Card, Logo, SectionLabel, Spinner } from "@/components/ui";
 
-function money(value: number | string) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value)); }
-function Metric({ label, value, detail, tone = "teal" }: { label: string; value: string; detail: string; tone?: "teal" | "amber" }) { return <Card className="p-5"><div className="flex items-start justify-between"><SectionLabel>{label}</SectionLabel><span className={`size-2 rounded-full ${tone === "amber" ? "bg-[#c78028]" : "bg-[#087f7b]"}`} /></div><div className="text-3xl font-semibold tracking-[-0.04em] text-[#17212b]">{value}</div><div className="mt-2 text-sm text-[#687684]">{detail}</div></Card>; }
-
-function RevenueChart({ values }: { values: SalesSummary[] }) {
-  const maximum = Math.max(...values.map((item) => Number(item.revenue)), 1);
-  return <Card className="p-6"><div className="flex items-start justify-between"><div><SectionLabel>Revenue trend</SectionLabel><h2 className="text-lg font-semibold text-[#17212b]">Product Luna</h2></div><span className="rounded-full bg-[#eaf7f5] px-3 py-1 text-xs font-bold text-[#087f7b]">Q2 → Q3</span></div><div className="mt-7 flex h-40 items-end gap-8 border-b border-[#dbe2e7] px-4">{values.map((item) => <div className="flex h-full flex-1 flex-col items-center justify-end gap-2" key={item.quarter}><div className="text-xs font-semibold text-[#31414c]">{money(item.revenue)}</div><div className={`w-full max-w-20 rounded-t-xl ${item.quarter === "Q3" ? "bg-[#087f7b]" : "bg-[#a9d5d0]"}`} style={{ height: `${Math.max((Number(item.revenue) / maximum) * 100, 8)}%` }} /><div className="-mb-6 text-xs font-bold text-[#687684]">{item.quarter}</div></div>)}</div><p className="mt-9 text-sm leading-6 text-[#687684]">Revenue moved from {money(values[0]?.revenue ?? 0)} to {money(values[1]?.revenue ?? 0)} in the selected period.</p></Card>;
-}
-
-function DiscountChart({ values }: { values: DiscountViolations }) {
-  const maximum = Math.max(values.total_violations, 1);
-  return <Card className="p-6"><SectionLabel>Discount controls</SectionLabel><h2 className="text-lg font-semibold text-[#17212b]">Policy violations</h2><div className="mt-7 space-y-5"><div><div className="mb-2 flex justify-between text-sm"><span className="text-[#687684]">Total violations</span><strong>{values.total_violations}</strong></div><div className="h-3 rounded-full bg-[#edf1f2]"><div className="h-3 rounded-full bg-[#c78028]" style={{ width: `${(values.total_violations / maximum) * 100}%` }} /></div></div><div><div className="mb-2 flex justify-between text-sm"><span className="text-[#687684]">Unapproved</span><strong>{values.unapproved_violations}</strong></div><div className="h-3 rounded-full bg-[#edf1f2]"><div className="h-3 rounded-full bg-[#d99a4b]" style={{ width: `${(values.unapproved_violations / maximum) * 100}%` }} /></div></div></div><p className="mt-7 text-sm leading-6 text-[#687684]">Unapproved violations represent cases requiring commercial review.</p></Card>;
+function money(value: number | string) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value));
 }
 
 export function DashboardView() {
-  const [sales, setSales] = useState<SalesSummary | null>(null); const [trend, setTrend] = useState<SalesSummary[]>([]); const [inventory, setInventory] = useState<InventoryRisk[] | null>(null); const [discounts, setDiscounts] = useState<DiscountViolations | null>(null); const [error, setError] = useState<string | null>(null); const [loading, setLoading] = useState(true);
-  useEffect(() => { Promise.all([getSalesSummary("Product Luna", "Q3"), getSalesSummary("Product Luna", "Q2"), getInventoryRisk(90), getDiscountViolations()]).then(([q3, q2, inventoryData, discountData]) => { setSales(q3); setTrend([q2, q3]); setInventory(inventoryData); setDiscounts(discountData); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Dashboard data is unavailable.")).finally(() => setLoading(false)); }, []);
+  const [sales, setSales] = useState<SalesSummary | null>(null);
+  const [trend, setTrend] = useState<SalesSummary[]>([]);
+  const [inventory, setInventory] = useState<InventoryRisk[] | null>(null);
+  const [discounts, setDiscounts] = useState<DiscountViolations | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      getSalesSummary("Product Luna", "Q3"),
+      getSalesSummary("Product Luna", "Q2"),
+      getInventoryRisk(90),
+      getDiscountViolations(),
+    ])
+      .then(([q3, q2, inventoryData, discountData]) => {
+        setSales(q3);
+        setTrend([q2, q3]);
+        setInventory(inventoryData);
+        setDiscounts(discountData);
+      })
+      .catch((reason) => setError(reason instanceof Error ? reason.message : "Dashboard data is unavailable."))
+      .finally(() => setLoading(false));
+  }, []);
+
   const oldest = inventory?.reduce((max, item) => Math.max(max, item.age_days), 0) ?? 0;
-  return <main className="min-h-screen"><header className="border-b border-[#dbe2e7] bg-white/90"><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8"><Logo /><Link href="/" className="rounded-lg px-3 py-2 text-sm font-semibold text-[#087f7b] hover:bg-[#e4f2f0]">Ask the analyst <span aria-hidden="true">→</span></Link></div></header><div className="mx-auto max-w-7xl px-5 py-10 lg:px-8"><div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#087f7b]">Executive overview · Q3</div><h1 className="text-4xl font-semibold tracking-[-0.04em] text-[#17212b]">Business pulse</h1><p className="mt-3 text-[#687684]">A concise view of the metrics currently available to InsightHub.</p></div><div className="rounded-xl border border-[#dbe2e7] bg-white px-4 py-3 text-sm text-[#687684]">Scope: <strong className="text-[#17212b]">Product Luna · Q2 / Q3</strong></div></div>{loading && <div className="flex items-center gap-3 rounded-xl border border-[#bfe0dc] bg-[#eaf7f5] p-4 text-sm text-[#087f7b]"><Spinner /> Loading live business data...</div>}{error && <div role="alert" className="rounded-xl border border-[#e8b8b4] bg-[#fff6f5] p-4 text-sm text-[#a33f36]">{error}</div>}<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Q3 revenue" value={sales ? money(sales.revenue) : "—"} detail={sales ? `${sales.product} · ${sales.quarter}` : "Awaiting sales API"} /><Metric label="Orders" value={sales ? sales.order_count.toLocaleString() : "—"} detail="Recorded in selected period" /><Metric label="Risky products" value={inventory ? inventory.length.toLocaleString() : "—"} detail="Inventory older than 90 days" tone="amber" /><Metric label="Policy violations" value={discounts ? discounts.total_violations.toLocaleString() : "—"} detail={discounts ? `${discounts.unapproved_violations} unapproved` : "Awaiting policy API"} tone="amber" /></div><div className="mt-8 grid gap-6 lg:grid-cols-2">{trend.length === 2 && <RevenueChart values={trend} />}{discounts && <DiscountChart values={discounts} />}</div><div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_.8fr]"><Card className="p-6"><SectionLabel>Inventory watchlist</SectionLabel>{inventory?.length ? <div className="divide-y divide-[#edf1f2]">{inventory.map((item) => <div className="flex items-center justify-between gap-4 py-4 first:pt-1" key={item.product}><div><div className="font-semibold text-[#17212b]">{item.product}</div><div className="mt-1 text-sm text-[#687684]">{item.stock_quantity.toLocaleString()} units in stock</div></div><div className="text-right"><div className="font-semibold text-[#c78028]">{item.age_days} days</div><div className="text-xs uppercase tracking-wide text-[#687684]">age</div></div></div>)}</div> : <div className="rounded-xl border border-dashed border-[#dbe2e7] p-5 text-sm text-[#687684]">No aging inventory returned.</div>}</Card><Card className="p-6"><SectionLabel>Signal notes</SectionLabel><div className="space-y-5"><div><div className="text-sm font-semibold text-[#17212b]">Oldest inventory</div><div className="mt-1 text-3xl font-semibold text-[#c78028]">{oldest || "—"}<span className="ml-1 text-base font-normal text-[#687684]">days</span></div></div><div className="border-t border-[#edf1f2] pt-5 text-sm leading-6 text-[#687684]">Use the analyst to connect these operational signals with policy and company knowledge.</div><Link href="/" className="inline-block text-sm font-bold text-[#087f7b]">Open a cross-source question →</Link></div></Card></div></div></main>;
+
+  return (
+    <AppShell page="Overview" scope="Product Luna">
+      <main className="w-full">
+        <div className="mb-8 flex flex-col justify-between gap-5 border-b border-line pb-6 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-3 text-label font-bold uppercase tracking-label text-brand">Executive overview · Q3</div>
+            <h1 className="text-4xl font-semibold tracking-heading text-ink">Business pulse</h1>
+            <p className="mt-3 text-muted">A concise view of the metrics currently available to InsightHub.</p>
+          </div>
+          <div className="rounded-control border border-line bg-surface px-4 py-3 text-sm text-muted">
+            Scope: <strong className="text-ink">Product Luna · Q2 / Q3</strong>
+          </div>
+        </div>
+
+        {loading ? <div className="mb-6 flex items-center gap-3 rounded-control border border-brand-border bg-brand-soft p-4 text-sm text-brand"><Spinner /> Loading live business data...</div> : null}
+        {error ? <div role="alert" className="mb-6 rounded-control border border-danger-border bg-danger-soft p-4 text-sm text-danger">{error}</div> : null}
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Q3 revenue" value={sales ? money(sales.revenue) : "—"} detail={sales ? `${sales.product} · ${sales.quarter}` : "Awaiting sales API"} />
+          <MetricCard label="Orders" value={sales ? sales.order_count.toLocaleString() : "—"} detail="Recorded in selected period" />
+          <MetricCard label="Risky products" value={inventory ? inventory.length.toLocaleString() : "—"} detail="Inventory older than 90 days" tone="warning" />
+          <MetricCard label="Policy violations" value={discounts ? discounts.total_violations.toLocaleString() : "—"} detail={discounts ? `${discounts.unapproved_violations} unapproved` : "Awaiting policy API"} tone="warning" />
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          {trend.length === 2 ? <RevenueChart values={trend} formatValue={money} /> : null}
+          {discounts ? <DiscountChart values={discounts} /> : null}
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
+          <Card className="p-6">
+            <SectionLabel>Inventory watchlist</SectionLabel>
+            {inventory?.length ? (
+              <div className="divide-y divide-line">
+                {inventory.map((item) => (
+                  <div className="flex items-center justify-between gap-4 py-4" key={item.product}>
+                    <div>
+                      <div className="font-semibold text-ink-soft">{item.product}</div>
+                      <div className="mt-1 text-sm text-muted">{item.stock_quantity.toLocaleString()} units in stock</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-semibold text-warning-strong">{item.age_days}</div>
+                      <div className="text-label font-bold uppercase tracking-label text-muted">age</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <EmptyState title="No aging inventory returned." />}
+          </Card>
+
+          <Card className="p-6">
+            <SectionLabel>Signal notes</SectionLabel>
+            <div className="space-y-5">
+              <div>
+                <div className="text-sm font-semibold text-ink">Oldest inventory</div>
+                <div className="mt-1 text-3xl font-semibold text-warning-strong">{oldest || "—"}<span className="ml-1 text-base font-normal text-muted">days</span></div>
+              </div>
+              <div className="border-t border-surface-muted pt-5 text-sm leading-6 text-muted">Use the analyst to connect these operational signals with policy and company knowledge.</div>
+              <Link href="/" className="inline-block text-sm font-bold text-brand">Open a cross-source question →</Link>
+            </div>
+          </Card>
+        </div>
+      </main>
+    </AppShell>
+  );
 }
