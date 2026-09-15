@@ -12,8 +12,8 @@ from app.api.data import (
 from app.main import app
 from app.tools.discount.models import DiscountViolations
 from app.tools.discount.service import DiscountService
-from app.tools.inventory.models import InventoryRisk
-from app.tools.sales.models import SalesSummary
+from app.tools.inventory.models import InventoryRisk, InventorySnapshotSummary
+from app.tools.sales.models import ReturnsSummary, SalesPerformance, SalesSummary
 
 
 class FakeSalesService:
@@ -52,6 +52,74 @@ class FakeDiscountService:
     ) -> DiscountViolations:
         assert threshold_percent in {None, Decimal("10")}
         return DiscountViolations(total_violations=180, unapproved_violations=120)
+
+
+class FakeSalesPerformanceService:
+    async def get_sales_performance(
+        self,
+        start_date: date,
+        end_date: date,
+        product_name: str | None,
+        region: str | None,
+        sales_channel: str | None,
+    ) -> list[SalesPerformance]:
+        assert (start_date, end_date, product_name, region, sales_channel) == (
+            date(2025, 7, 1),
+            date(2025, 10, 1),
+            "Product Luna",
+            "Midwest",
+            "Web",
+        )
+        return [
+            SalesPerformance(
+                product="Product Luna",
+                region="Midwest",
+                sales_channel="Web",
+                gross_revenue=Decimal("1000.00"),
+                net_revenue=Decimal("940.00"),
+                units_sold=10,
+                order_count=8,
+                average_order_value=Decimal("125.00"),
+                gross_margin=Decimal("360.00"),
+            )
+        ]
+
+    async def get_returns_summary(
+        self, start_date: date, end_date: date, product_name: str | None
+    ) -> ReturnsSummary:
+        assert (start_date, end_date, product_name) == (
+            date(2025, 7, 1),
+            date(2025, 10, 1),
+            "Product Luna",
+        )
+        return ReturnsSummary(
+            product="Product Luna",
+            returned_units=2,
+            refund_amount=Decimal("60.00"),
+            return_rate=Decimal("0.2"),
+        )
+
+
+class FakeInventorySnapshotService:
+    async def get_inventory_snapshot(
+        self, snapshot_date: date, product_name: str | None, warehouse_name: str | None
+    ) -> list[InventorySnapshotSummary]:
+        assert (snapshot_date, product_name, warehouse_name) == (
+            date(2025, 9, 30),
+            "Product Luna",
+            "Central Hub",
+        )
+        return [
+            InventorySnapshotSummary(
+                product="Product Luna",
+                warehouse="Central Hub",
+                snapshot_date=snapshot_date,
+                on_hand_quantity=12000,
+                reserved_quantity=900,
+                available_quantity=11100,
+                age_days=138,
+            )
+        ]
 
 
 def test_sales_endpoint_returns_typed_summary() -> None:
@@ -105,6 +173,59 @@ def test_inventory_endpoint_accepts_historical_as_of_date() -> None:
     }
 
 
+def test_sales_performance_and_returns_endpoints_are_typed_and_bounded() -> None:
+    app.dependency_overrides[get_sales_service] = FakeSalesPerformanceService
+    try:
+        client = TestClient(app)
+        params = {
+            "start_date": "2025-07-01",
+            "end_date": "2025-10-01",
+            "product_name": "Product Luna",
+            "region": "Midwest",
+            "sales_channel": "Web",
+        }
+        performance = client.get("/api/v1/data/sales/performance", params=params)
+        return_params = {
+            key: value
+            for key, value in params.items()
+            if key not in {"region", "sales_channel"}
+        }
+        returns = client.get(
+            "/api/v1/data/returns/summary",
+            params=return_params,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert performance.status_code == 200
+    assert performance.json()[0]["net_revenue"] == "940.00"
+    assert returns.status_code == 200
+    assert returns.json() == {
+        "product": "Product Luna",
+        "returned_units": 2,
+        "refund_amount": "60.00",
+        "return_rate": "0.2",
+    }
+
+
+def test_inventory_snapshots_endpoint_returns_available_inventory() -> None:
+    app.dependency_overrides[get_inventory_service] = FakeInventorySnapshotService
+    try:
+        response = TestClient(app).get(
+            "/api/v1/data/inventory/snapshots",
+            params={
+                "snapshot_date": "2025-09-30",
+                "product_name": "Product Luna",
+                "warehouse_name": "Central Hub",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()[0]["available_quantity"] == 11100
+
+
 def test_discount_endpoint_returns_expected_violations() -> None:
     app.dependency_overrides[get_discount_service] = FakeDiscountService
     try:
@@ -139,6 +260,14 @@ def test_data_endpoints_validate_parameters() -> None:
         assert client.get(
             "/api/v1/data/sales/summary",
             params={"product_name": "Luna", "quarter": "2025"},
+        ).status_code == 422
+        assert client.get(
+            "/api/v1/data/sales/performance",
+            params={
+                "start_date": "2025-07-01",
+                "end_date": "2025-10-01",
+                "region": "Unknown",
+            },
         ).status_code == 422
         assert client.get(
             "/api/v1/data/inventory/risk", params={"age_threshold_days": 0}

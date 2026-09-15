@@ -8,10 +8,10 @@ from app.data.session import get_db_session
 from app.tools.discount.models import DiscountViolations
 from app.tools.discount.repository import DiscountRepository
 from app.tools.discount.service import DiscountService
-from app.tools.inventory.models import InventoryRisk
+from app.tools.inventory.models import InventoryRisk, InventorySnapshotSummary
 from app.tools.inventory.repository import InventoryRepository
 from app.tools.inventory.service import InventoryService
-from app.tools.sales.models import SalesSummary
+from app.tools.sales.models import ReturnsSummary, SalesPerformance, SalesSummary
 from app.tools.sales.repository import SalesRepository
 from app.tools.sales.service import SalesService
 
@@ -45,6 +45,30 @@ async def sales_summary(
     return await service.get_sales_summary(product_name.strip(), quarter)
 
 
+@router.get("/sales/performance", response_model=list[SalesPerformance])
+async def sales_performance(
+    start_date: date = Query(...),  # noqa: B008
+    end_date: date = Query(...),  # noqa: B008
+    product_name: str | None = Query(default=None, min_length=1, max_length=200),  # noqa: B008
+    region: str | None = Query(default=None, pattern=r"^(Northeast|Southeast|Midwest|West)$"),  # noqa: B008
+    sales_channel: str | None = Query(default=None, pattern=r"^(Web|Mobile|Marketplace)$"),  # noqa: B008
+    service: SalesService = Depends(get_sales_service),  # noqa: B008
+) -> list[SalesPerformance]:
+    return await service.get_sales_performance(
+        start_date, end_date, product_name, region, sales_channel
+    )
+
+
+@router.get("/returns/summary", response_model=ReturnsSummary)
+async def returns_summary(
+    start_date: date = Query(...),  # noqa: B008
+    end_date: date = Query(...),  # noqa: B008
+    product_name: str | None = Query(default=None, min_length=1, max_length=200),  # noqa: B008
+    service: SalesService = Depends(get_sales_service),  # noqa: B008
+) -> ReturnsSummary:
+    return await service.get_returns_summary(start_date, end_date, product_name)
+
+
 @router.get("/inventory/risk", response_model=list[InventoryRisk])
 async def inventory_risk(
     age_threshold_days: int = Query(..., ge=1, le=3650),  # noqa: B008
@@ -52,6 +76,16 @@ async def inventory_risk(
     service: InventoryService = Depends(get_inventory_service),  # noqa: B008
 ) -> list[InventoryRisk]:
     return await service.get_inventory_risk(age_threshold_days, as_of_date)
+
+
+@router.get("/inventory/snapshots", response_model=list[InventorySnapshotSummary])
+async def inventory_snapshots(
+    snapshot_date: date = Query(...),  # noqa: B008
+    product_name: str | None = Query(default=None, min_length=1, max_length=200),  # noqa: B008
+    warehouse_name: str | None = Query(default=None, min_length=1, max_length=100),  # noqa: B008
+    service: InventoryService = Depends(get_inventory_service),  # noqa: B008
+) -> list[InventorySnapshotSummary]:
+    return await service.get_inventory_snapshot(snapshot_date, product_name, warehouse_name)
 
 
 @router.get("/discount/violations", response_model=DiscountViolations)
